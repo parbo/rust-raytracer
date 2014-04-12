@@ -1,3 +1,5 @@
+extern crate std;
+
 #[deriving(Eq)]
 #[deriving(Show)]
 pub enum Token {

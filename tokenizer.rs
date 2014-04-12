@@ -4,7 +4,9 @@ extern crate regexp;
 
 use regexp::Regexp;
 
-enum Token {
+#[deriving(Eq)]
+#[deriving(Show)]
+pub enum Token {
     Whitespace,
     Comment,
     BeginFunction,
@@ -131,7 +133,7 @@ fn string_tokenizer(a: &str) -> Option<Result> {
     }
 }
 
-fn tokenize(text: &str) {
+pub fn tokenize(text: &str) -> ~[Token] {
     let tokenizers = [whitespace_tokenizer,
                       comment_tokenizer,
                       begin_function_tokenizer,
@@ -166,85 +168,63 @@ fn tokenize(text: &str) {
             break;
         }
     }
-    println!("{:?}", tokenlist);
+
+    return tokenlist;
 }
-
-fn main() {
-    tokenize("1 % apa");
-    tokenize("1 % apa\n2");
-    tokenize("1");
-    tokenize("123");
-    tokenize("-1");
-    tokenize("-123");
-    tokenize("1 2");
-    tokenize("123 321");
-    tokenize("-1-1");
-    tokenize("1.0");
-    tokenize("-1.0");
-    tokenize("1.0e12");
-    tokenize("1e12");
-    tokenize("1e-12");
-    tokenize("1e-2");
-    tokenize("\"test\"");
-    tokenize("true");
-    tokenize("false");
-    tokenize("/x");
-    tokenize("/x-y_2");
-    tokenize("x");
-    tokenize("x-y_2");
-    tokenize("addi");
-    tokenize("/addi");
-    tokenize("[1 2]");
-    tokenize("{1 2}");
-    tokenize("{1 [2 3]}");
-}
-
-//     # Run some tests
-//     test("1 % apa", [('Integer', 1)])
-//     test("1 % apa\n2", [('Integer', 1), ('Integer', 2)])
-//     test("1", [('Integer', 1)])
-//     test("123", [('Integer', 123)])
-//     test("-1", [('Integer', -1)])
-//     test("-123", [('Integer', -123)])
-//     test("1 2", [('Integer', 1), ('Integer', 2)])
-//     test("123 321", [('Integer', 123), ('Integer', 321)])
-//     test("-1-1", [('Integer', -1), ('Integer', -1)])
-//     test("1.0", [('Real', 1.0)])
-//     test("-1.0", [('Real', -1.0)])
-//     test("1.0e12", [('Real', 1.0e12)])
-//     test("1e12", [('Real', 1e12)])
-//     test("1e-12", [('Real', 1e-12)])
-//     test("\"test\"", [('String', 'test')])
-//     test("true", [('Boolean', True)])
-//     test("false", [('Boolean', False)])
-//     test("/x", [('Binder', 'x')])
-//     test("/x-y_2", [('Binder', 'x-y_2')])
-//     test("x", [('Identifier', 'x')])
-//     test("x-y_2", [('Identifier', 'x-y_2')])
-//     test("addi", [('Operator', 'addi')])
-//     test("[1 2]", [('BeginArray', None),
-//                    ('Integer', 1),
-//                    ('Integer', 2),
-//                    ('EndArray', None)])
-//     test("{1 2}", [('BeginFunction', None),
-//                    ('Integer', 1),
-//                    ('Integer', 2),
-//                    ('EndFunction', None)])
-//     test("{1 [2 3]}", [('BeginFunction', None),
-//                        ('Integer', 1),
-//                        ('BeginArray', None),
-//                        ('Integer', 2),
-//                        ('Integer', 3),
-//                        ('EndArray', None),
-//                        ('EndFunction', None)])
-
-    
-
 
 #[cfg(test)]
 mod tests {
+    // TODO: surely there must be an easier way to import stuff?
+    use super::tokenize;
+    use super::Integer;
+    use super::Real;
+    use super::String;
+    use super::Boolean;
+    use super::Identifier;
+    use super::Binder;
+    use super::Operator;
+    use super::BeginArray;
+    use super::EndArray;
+    use super::BeginFunction;
+    use super::EndFunction;
     #[test]
-    fn return_none_if_empty() {
-      // ... test code ...
+    fn test_tokenizer() {
+        assert_eq!(tokenize("1 % apa"), ~[Integer(1)]);
+        assert_eq!(tokenize("1 % apa\n2"), ~[Integer(1), Integer(2)]);
+        assert_eq!(tokenize("1"), ~[Integer(1)]);
+        assert_eq!(tokenize("123"), ~[Integer(123)]);
+        assert_eq!(tokenize("-1"), ~[Integer(-1)]);
+        assert_eq!(tokenize("-123"), ~[Integer(-123)]);
+        assert_eq!(tokenize("1 2"), ~[Integer( 1), Integer(2)]);
+        assert_eq!(tokenize("123 321"), ~[Integer(123), Integer(321)]);
+        assert_eq!(tokenize("-1-1"), ~[Integer(-1), Integer(-1)]);
+        assert_eq!(tokenize("1.0"), ~[Real(1.0)]);
+        assert_eq!(tokenize("-1.0"), ~[Real(-1.0)]);
+        assert_eq!(tokenize("1.0e12"), ~[Real(1.0e12)]);
+        assert_eq!(tokenize("1e12"), ~[Real(1e12)]);
+        assert_eq!(tokenize("1e-12"), ~[Real(1e-12)]);
+        assert_eq!(tokenize("\"test\""), ~[String(~"test")]);
+        assert_eq!(tokenize("true"), ~[Boolean(true)]);
+        assert_eq!(tokenize("false"), ~[Boolean(false)]);
+        assert_eq!(tokenize("/x"), ~[Binder(~"x")]);
+        assert_eq!(tokenize("/x-y_2"), ~[Binder(~"x-y_2")]);
+        assert_eq!(tokenize("x"), ~[Identifier(~"x")]);
+        assert_eq!(tokenize("x-y_2"), ~[Identifier(~"x-y_2")]);
+        assert_eq!(tokenize("addi"), ~[Operator(~"addi")]);
+        assert_eq!(tokenize("[1 2]"), ~[BeginArray,
+                                        Integer(1),
+                                        Integer(2),
+                                        EndArray]);
+        assert_eq!(tokenize("{1 2}"), ~[BeginFunction,
+                                        Integer(1),
+                                        Integer(2),
+                                        EndFunction]);
+        assert_eq!(tokenize("{1 [2 3]}"), ~[BeginFunction,
+                                            Integer(1),
+                                            BeginArray,
+                                            Integer(2),
+                                            Integer(3),
+                                            EndArray,
+                                            EndFunction])
     }
 }

@@ -1,13 +1,8 @@
-#![allow(unused_imports)]
-
 #![feature(phase)]
 extern crate regexp;
 #[phase(syntax)] extern crate regexp_re;
 
 use regexp::Regexp;
-use std::fmt;
-use std::str;
-use std::vec;
 
 enum Token {
     Whitespace,

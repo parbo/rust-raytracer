@@ -97,7 +97,6 @@ fn push(stack: ~Stack, value: Value) -> ~Stack {
 }
 
 fn pop(stack: ~Stack) -> (Value, ~Stack) {
-    println!("pop from stack: {}", stack);
     match stack {
         ~Cons(token, rest_of_stack) => {
             (token, rest_of_stack.clone())
@@ -159,20 +158,6 @@ fn eval_addf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     let (r2, s) = pop(stack);
     let (r1, s) = pop(s);
     (env, push(s, ValReal(get_real(&r1) + get_real(&r2))))
-}
-
-fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
-    match op {
-        &parser::tokenizer::OpAddi => eval_addi(env, stack),
-        &parser::tokenizer::OpAddf => eval_addf(env, stack),
-        &parser::tokenizer::OpApply => eval_apply(env, stack),
-        &parser::tokenizer::OpEqi => eval_eqi(env, stack),
-        &parser::tokenizer::OpEqf => eval_eqf(env, stack),
-        &parser::tokenizer::OpIf => eval_if(env, stack),
-        &parser::tokenizer::OpLessi => eval_lessi(env, stack),
-        &parser::tokenizer::OpLessf => eval_lessf(env, stack),
-        _ => fail!("operator {} not implemented yet!", op)
-    }
 }
 
 // def eval_acos(env, stack):
@@ -256,23 +241,27 @@ fn eval_lessf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
 //     i1, stack = pop(stack)
 //     return env, push(stack, make_integer(modi(get_integer(i1), get_integer(i2))))
 
-// def eval_muli(env, stack):
-//     i2, stack = pop(stack)
-//     i1, stack = pop(stack)
-//     return env, push(stack, make_integer(get_integer(i1)*get_integer(i2)))
+fn eval_muli(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (i2, s) = pop(stack);
+    let (i1, s) = pop(s);
+    (env, push(s, ValInteger(get_integer(&i1) * get_integer(&i2))))
+}
 
-// def eval_mulf(env, stack):
-//     r2, stack = pop(stack)
-//     r1, stack = pop(stack)
-//     return env, push(stack, make_real(get_real(r1)*get_real(r2)))
+fn eval_mulf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (r2, s) = pop(stack);
+    let (r1, s) = pop(s);
+    (env, push(s, ValReal(get_real(&r1) * get_real(&r2))))
+}
 
-// def eval_negi(env, stack):
-//     i, stack = pop(stack)
-//     return env, push(stack, make_integer(-get_integer(i)))
+fn eval_negi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (i, s) = pop(stack);
+    (env, push(s, ValInteger(-get_integer(&i))))
+}
 
-// def eval_negf(env, stack):
-//     r, stack = pop(stack)
-//     return env, push(stack, make_real(-get_real(r)))
+fn eval_negf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (r, s) = pop(stack);
+    (env, push(s, ValReal(-get_real(&r))))
+}
 
 // def eval_real(env, stack):
 //     i, stack = pop(stack)
@@ -289,15 +278,17 @@ fn eval_lessf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
 //     r, stack = pop(stack)
 //     return env, push(stack, make_real(math.sqrt(get_real(r))))
 
-// def eval_subi(env, stack):
-//     i2, stack = pop(stack)
-//     i1, stack = pop(stack)
-//     return env, push(stack, make_integer(get_integer(i1)-get_integer(i2)))    
+fn eval_subi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (i2, s) = pop(stack);
+    let (i1, s) = pop(s);
+    (env, push(s, ValInteger(get_integer(&i1) - get_integer(&i2))))
+}
 
-// def eval_subf(env, stack):
-//     r2, stack = pop(stack)
-//     r1, stack = pop(stack)
-//     return env, push(stack, make_real(get_real(r1)-get_real(r2)))
+fn eval_subf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (r2, s) = pop(stack);
+    let (r1, s) = pop(s);
+    (env, push(s, ValReal(get_real(&r1) - get_real(&r2))))
+}
 
 // def eval_point(env, stack):
 //     z, stack = pop(stack)
@@ -452,6 +443,26 @@ fn eval_lessf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
 //                      get_string(file))
 //     return env, stack
 
+fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    match op {
+        &parser::tokenizer::OpAddi => eval_addi(env, stack),
+        &parser::tokenizer::OpAddf => eval_addf(env, stack),
+        &parser::tokenizer::OpApply => eval_apply(env, stack),
+        &parser::tokenizer::OpEqi => eval_eqi(env, stack),
+        &parser::tokenizer::OpEqf => eval_eqf(env, stack),
+        &parser::tokenizer::OpIf => eval_if(env, stack),
+        &parser::tokenizer::OpLessi => eval_lessi(env, stack),
+        &parser::tokenizer::OpLessf => eval_lessf(env, stack),
+        &parser::tokenizer::OpMuli => eval_muli(env, stack),
+        &parser::tokenizer::OpMulf => eval_mulf(env, stack),
+        &parser::tokenizer::OpNegi => eval_negi(env, stack),
+        &parser::tokenizer::OpNegf => eval_negf(env, stack),
+        &parser::tokenizer::OpSubi => eval_subi(env, stack),
+        &parser::tokenizer::OpSubf => eval_subf(env, stack),
+        _ => fail!("operator {} not implemented yet!", op)
+    }
+}
+
 // def get_surface(surface):
 //     assert check_closure(surface)
 //     def do_surface(face, u, v):
@@ -594,18 +605,18 @@ fn test_evaluator() {
     let  (env, stack) = run("1.0 2.0 lessf");
     println!("env: {}, stack: {}", env, stack);
     assert_eq!(stack, ~Cons(ValBoolean(true), ~Nil));
-//     env, stack, ast = run("false /b b { 1 } { 2 } if")
-//     print stack
-//     env, stack, ast = run("4 /x 2 x addi")
-//     print stack
-//     env, stack, ast = run("1 { /x x x } apply addi")
-//     print stack
-//     env, stack, ast = run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply")
-//     print stack
-//     env, stack, ast = run("{ /x /y x y } /swap 3 4 swap apply")
-//     print stack
-//     env, stack, ast = run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact apply")
-//     print stack
+    let  (env, stack) = run("false /b b { 1 } { 2 } if");
+    println!("env: {}, stack: {}", env, stack);
+    let  (env, stack) = run("4 /x 2 x addi");
+    println!("env: {}, stack: {}", env, stack);
+    let  (env, stack) = run("1 { /x x x } apply addi");
+    println!("env: {}, stack: {}", env, stack);
+    let  (env, stack) = run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply");
+    println!("env: {}, stack: {}", env, stack);
+    let  (env, stack) = run("{ /x /y x y } /swap 3 4 swap apply");
+    println!("env: {}, stack: {}", env, stack);
+    let  (env, stack) = run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact apply");
+    println!("env: {}, stack: {}", env, stack);
 //     for u in range(10):
 //         for v in range(10):
 //             prog = """1 /col1 2 /col2 %f /u %f /v { /y /x x x mulf y y mulf addf sqrt } /dist

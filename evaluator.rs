@@ -169,6 +169,8 @@ fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack)
         &parser::tokenizer::OpEqi => eval_eqi(env, stack),
         &parser::tokenizer::OpEqf => eval_eqf(env, stack),
         &parser::tokenizer::OpIf => eval_if(env, stack),
+        &parser::tokenizer::OpLessi => eval_lessi(env, stack),
+        &parser::tokenizer::OpLessf => eval_lessf(env, stack),
         _ => fail!("operator {} not implemented yet!", op)
     }
 }
@@ -216,9 +218,9 @@ fn eval_eqi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
 }
 
 fn eval_eqf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
-    let (f2, s) = pop(stack);
-    let (f1, s) = pop(s);
-    let rv = get_real(&f1) == get_real(&f2);
+    let (r2, s) = pop(stack);
+    let (r1, s) = pop(s);
+    let rv = get_real(&r1) == get_real(&r2);
     (env, push(s, ValBoolean(rv)))
 }
 
@@ -230,22 +232,25 @@ fn eval_eqf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
 //     r, stack = pop(stack)
 //     return env, push(stack, make_real(math.modf(get_real(r))[0]))
 
-// def eval_lessi(env, stack):
-//     i2, stack = pop(stack)
-//     i1, stack = pop(stack)
-//     rv = False
-//     if get_integer(i1) < get_integer(i2):
-//         rv = True
-//     return env, push(stack, make_boolean(rv))
+fn eval_lessi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (i2, s) = pop(stack);
+    let (i1, s) = pop(s);
+    if get_integer(&i1) < get_integer(&i2) {
+        (env, push(s, ValBoolean(true)))
+    } else {
+        (env, push(s, ValBoolean(false)))
+    }
+}
 
-// def eval_lessf(env, stack):
-//     r2, stack = pop(stack)
-//     r1, stack = pop(stack)
-//     rv = False
-//     if get_real(r1) < get_real(r2):
-//         rv = True
-//     return env, push(stack, make_boolean(rv))
-
+fn eval_lessf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (r2, s) = pop(stack);
+    let (r1, s) = pop(s);
+    if get_real(&r1) < get_real(&r2) {
+        (env, push(s, ValBoolean(true)))
+    } else {
+        (env, push(s, ValBoolean(false)))
+    }
+}
 // def eval_modi(env, stack):
 //     i2, stack = pop(stack)
 //     i1, stack = pop(stack)
@@ -569,6 +574,24 @@ fn test_evaluator() {
     println!("env: {}, stack: {}", env, stack);
     assert_eq!(stack, ~Cons(ValBoolean(false), ~Nil));
     let  (env, stack) = run("5.123 5.123 eqf");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValBoolean(true), ~Nil));
+    let  (env, stack) = run("2 1 lessi");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValBoolean(false), ~Nil));
+    let  (env, stack) = run("2 2 lessi");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValBoolean(false), ~Nil));
+    let  (env, stack) = run("1 2 lessi");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValBoolean(true), ~Nil));
+    let  (env, stack) = run("2.0 1.0 lessf");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValBoolean(false), ~Nil));
+    let  (env, stack) = run("2.0 2.0 lessf");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValBoolean(false), ~Nil));
+    let  (env, stack) = run("1.0 2.0 lessf");
     println!("env: {}, stack: {}", env, stack);
     assert_eq!(stack, ~Cons(ValBoolean(true), ~Nil));
 //     env, stack, ast = run("false /b b { 1 } { 2 } if")

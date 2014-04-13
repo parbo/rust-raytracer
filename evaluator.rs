@@ -10,6 +10,12 @@ pub mod parser;
 
 type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
 
+#[deriving(Eq, Show, Clone)]
+enum Stack {
+    Cons(parser::tokenizer::Token, ~Stack),
+    Nil
+}
+
 // class GMLRuntimeError(Exception):
 //     pass
 
@@ -50,9 +56,12 @@ type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
 //     assert type(v) == int
 //     return ('Integer', v)
 
-// def get_integer(i):
-//     assert check_integer(i)
-//     return get_value(i)
+fn get_integer(v: &parser::tokenizer::Token) -> i64 {
+    match v {
+        &parser::tokenizer::Integer(i) => i,
+        other => fail!("{} is not an integer", other)
+    }
+}
 
 // def make_string(v):
 //     assert type(v) == str
@@ -132,8 +141,19 @@ type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
 // def push(stack, elem):
 //     return (elem, stack)
 
-// def pop(stack):
-//     return stack[0], stack[1]
+fn push(stack: ~Stack, value: parser::tokenizer::Token) -> ~Stack {
+    ~Cons(value, stack)
+}
+
+fn pop(stack: ~Stack) -> Option<(parser::tokenizer::Token, ~Stack)> {
+    println!("pop from stack: {}", stack);
+    match stack {
+        ~Cons(token, rest_of_stack) => {
+            Some((token, rest_of_stack))
+        },
+        ~Nil => None
+    }
+}
 
 // def make_env():
 //     return {}
@@ -142,6 +162,11 @@ type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
 //     newenv = dict(env)
 //     newenv[key] = value
 //     return newenv
+
+fn add_env(mut env: ~Env, key: ~str, value: parser::tokenizer::Token) -> ~Env {
+    env.insert(key, value);
+    env
+}
 
 // def get_env(env, key):
 //     return env[key]
@@ -162,10 +187,11 @@ type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
 //     e, s, a = do_evaluate(get_closure_env(c), stack, get_closure_function(c))
 //     return env, s
 
-// def eval_addi(env, stack):
-//     i2, stack = pop(stack)
-//     i1, stack = pop(stack)
-//     return env, push(stack, make_integer(get_integer(i1)+get_integer(i2)))
+fn eval_addi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (i2, s1) = pop(stack).unwrap();
+    let (i1, s2) = pop(s1).unwrap();
+    (env, push(s2, parser::tokenizer::Integer(get_integer(&i1) + get_integer(&i2))))
+}
 
 // def eval_addf(env, stack):
 //     r2, stack = pop(stack)
@@ -465,7 +491,7 @@ type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
 //         return get_point(sc), get_real(kd), get_real(ks), get_real(n)
 //     return do_surface
 
-fn do_evaluate(env: ~Env, stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Stack) {
+fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Stack) {
     for i in range(0, ast.len()) {
         match &ast[i] {
             &parser::Function(_) => {
@@ -479,7 +505,7 @@ fn do_evaluate(env: ~Env, stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Sta
             &parser::Leaf(ref t) => {
                 match t {
                     &parser::tokenizer::Integer(ref v) => {
-//             stack = push(stack, node)
+                        stack = push(stack, t.clone())
                     },
                     &parser::tokenizer::Real(ref v) => {
 //             stack = push(stack, node)
@@ -491,8 +517,9 @@ fn do_evaluate(env: ~Env, stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Sta
 //             stack = push(stack, node)
                     },
                     &parser::tokenizer::Binder(ref v) => {
-//             i, stack = pop(stack)
-//             env = add_env(env, v, i)
+                        let (i, s) = pop(stack).unwrap();
+                        stack = s;
+                        env = add_env(env, v.clone(), i);
                     },
                     &parser::tokenizer::Identifier(ref v) => {
 //             try:
@@ -504,6 +531,12 @@ fn do_evaluate(env: ~Env, stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Sta
 //                 raise GMLRuntimeError
                     },
                     &parser::tokenizer::Operator(ref v) => {
+                        // Let's cheat a little, we should really use the type system for dispatch
+                        if *v == ~"addi" {
+                            let (e, s) = eval_addi(env, stack);
+                            env = e;
+                            stack = s;
+                        }
 //             env, stack = globals()["eval_"+v](env, stack)
                     },
                     token => {
@@ -527,11 +560,6 @@ fn do_evaluate(env: ~Env, stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Sta
 //     except Exception, e:
 //         if type(res) != type or not isinstance(e, res):
 //             raise
-
-enum Stack {
-    Cons(parser::tokenizer::Token, ~Stack),
-    Nil
-}
 
 fn evaluate(ast: ~[parser::AstNode]) -> (~Env, ~Stack) {
     // Apparently can't call static methods on aliased types, so her goes the full name of Env
@@ -589,7 +617,11 @@ pub fn run(gml: &str) -> (~Env, ~Stack) {
 #[test]
 fn test_evaluator() {
     let  (env, stack) = run("1 /x");
-//     print env['x']
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(env.get(&~"x"), &parser::tokenizer::Integer(1));
+    let  (env, stack) = run("1 2 addi");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(parser::tokenizer::Integer(3), ~Nil));
 //     env, stack, ast = run("true { 1 } { 2 } if")
 //     print stack
 //     env, stack, ast = run("false { 1 } { 2 } if")
@@ -597,8 +629,6 @@ fn test_evaluator() {
 //     env, stack, ast = run("false /b b { 1 } { 2 } if")
 //     print stack
 //     env, stack, ast = run("1 { /x x x } apply")
-//     print stack
-//     env, stack, ast = run("1 2 addi")
 //     print stack
 //     env, stack, ast = run("4 /x 2 x addi")
 //     print stack

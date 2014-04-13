@@ -443,23 +443,25 @@ fn eval_subf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
 //                      get_string(file))
 //     return env, stack
 
-fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
-    match op {
-        &parser::tokenizer::OpAddi => eval_addi(env, stack),
-        &parser::tokenizer::OpAddf => eval_addf(env, stack),
-        &parser::tokenizer::OpApply => eval_apply(env, stack),
-        &parser::tokenizer::OpEqi => eval_eqi(env, stack),
-        &parser::tokenizer::OpEqf => eval_eqf(env, stack),
-        &parser::tokenizer::OpIf => eval_if(env, stack),
-        &parser::tokenizer::OpLessi => eval_lessi(env, stack),
-        &parser::tokenizer::OpLessf => eval_lessf(env, stack),
-        &parser::tokenizer::OpMuli => eval_muli(env, stack),
-        &parser::tokenizer::OpMulf => eval_mulf(env, stack),
-        &parser::tokenizer::OpNegi => eval_negi(env, stack),
-        &parser::tokenizer::OpNegf => eval_negf(env, stack),
-        &parser::tokenizer::OpSubi => eval_subi(env, stack),
-        &parser::tokenizer::OpSubf => eval_subf(env, stack),
-        _ => fail!("operator {} not implemented yet!", op)
+impl parser::tokenizer::Ops {
+    fn eval(&self, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+        match self {
+            &parser::tokenizer::OpAddi => eval_addi(env, stack),
+            &parser::tokenizer::OpAddf => eval_addf(env, stack),
+            &parser::tokenizer::OpApply => eval_apply(env, stack),
+            &parser::tokenizer::OpEqi => eval_eqi(env, stack),
+            &parser::tokenizer::OpEqf => eval_eqf(env, stack),
+            &parser::tokenizer::OpIf => eval_if(env, stack),
+            &parser::tokenizer::OpLessi => eval_lessi(env, stack),
+            &parser::tokenizer::OpLessf => eval_lessf(env, stack),
+            &parser::tokenizer::OpMuli => eval_muli(env, stack),
+            &parser::tokenizer::OpMulf => eval_mulf(env, stack),
+            &parser::tokenizer::OpNegi => eval_negi(env, stack),
+            &parser::tokenizer::OpNegf => eval_negf(env, stack),
+            &parser::tokenizer::OpSubi => eval_subi(env, stack),
+            &parser::tokenizer::OpSubf => eval_subf(env, stack),
+            _ => fail!("operator {} not implemented yet!", self)
+        }
     }
 }
 
@@ -516,7 +518,7 @@ fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~E
                         stack = push(stack, val.clone())
                     },
                     &parser::tokenizer::Operator(ref v) => {
-                        let (e, s) = eval(v, env, stack);
+                        let (e, s) = v.eval(env, stack);
                         env = e;
                         stack = s;
                     },

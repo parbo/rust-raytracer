@@ -193,6 +193,13 @@ fn eval_addi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     (env, push(s2, parser::tokenizer::Integer(get_integer(&i1) + get_integer(&i2))))
 }
 
+fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    match op {
+        &parser::tokenizer::OpAddi => eval_addi(env, stack),
+        _ => fail!("operator {} not implemented yet!", op)
+    }
+}
+
 // def eval_addf(env, stack):
 //     r2, stack = pop(stack)
 //     r1, stack = pop(stack)
@@ -531,13 +538,9 @@ fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~E
 //                 raise GMLRuntimeError
                     },
                     &parser::tokenizer::Operator(ref v) => {
-                        // Let's cheat a little, we should really use the type system for dispatch
-                        if *v == ~"addi" {
-                            let (e, s) = eval_addi(env, stack);
-                            env = e;
-                            stack = s;
-                        }
-//             env, stack = globals()["eval_"+v](env, stack)
+                        let (e, s) = eval(v, env, stack);
+                        env = e;
+                        stack = s;
                     },
                     token => {
                         fail!("evaluate error, unknown token: {}", token);

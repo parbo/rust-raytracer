@@ -1,6 +1,60 @@
 extern crate std;
 
 #[deriving(Eq, Show, Clone)]
+pub enum Ops {
+    OpAcos,
+    OpAddf,
+    OpAddi,
+    OpApply,
+    OpAsin,
+    OpClampf,
+    OpCone,
+    OpCos,
+    OpCube,
+    OpCylinder,
+    OpDifference,
+    OpDivf,
+    OpDivi,
+    OpEqf,
+    OpEqi,
+    OpFloor,
+    OpFrac,
+    OpGet,
+    OpGetx,
+    OpGety,
+    OpGetz,
+    OpIf,
+    OpIntersect,
+    OpLength,
+    OpLessf,
+    OpLessi,
+    OpLight,
+    OpModi,
+    OpMulf,
+    OpMuli,
+    OpNegf,
+    OpNegi,
+    OpPlane,
+    OpPoint,
+    OpPointlight,
+    OpReal,
+    OpRender,
+    OpRotatex,
+    OpRotatey,
+    OpRotatez,
+    OpScale,
+    OpSin,
+    OpSphere,
+    OpSpotlight,
+    OpSqrt,
+    OpSubf,
+    OpSubi,
+    OpTranslate,
+    OpUnion,
+    OpUscale
+}
+
+#[deriving(Eq, Show, Clone)]
 pub enum Token {
     Whitespace,
     Comment,
@@ -9,7 +63,7 @@ pub enum Token {
     BeginArray,
     EndArray,
     Identifier(~str),
-    Operator(~str),
+    Operator(Ops),
     Binder(~str),
     Boolean(bool),
     Real(f64),
@@ -129,66 +183,60 @@ fn is_exponent(c: char) -> bool {
     }
 }
 
-fn match_operator(a: &str) -> Option<&str> {
-    // Sorted descending on length to get greedy match
-    // TODO: how do I make it static?
-    let operators = [
-        "difference",
-        "pointlight",
-        "intersect",
-        "spotlight",
-        "translate",
-        "cylinder",
-        "rotatex",
-        "rotatey",
-        "rotatez",
-        "clampf",
-        "length",
-        "render",
-        "sphere",
-        "uscale",
-        "apply",
-        "floor",
-        "lessf",
-        "lessi",
-        "light",
-        "plane",
-        "point",
-        "scale",
-        "union",
-        "acos",
-        "addf",
-        "addi",
-        "asin",
-        "cone",
-        "cube",
-        "divf",
-        "divi",
-        "frac",
-        "getx",
-        "gety",
-        "getz",
-        "modi",
-        "mulf",
-        "muli",
-        "negf",
-        "negi",
-        "real",
-        "sqrt",
-        "subf",
-        "subi",
-        "cos",
-        "eqf",
-        "eqi",
-        "get",
-        "sin",
-        "if"];
-    for &op in operators.iter() {
-        if op == a {
-            return Some(op);
-        }
+fn match_operator(a: &str) -> Option<Ops> {
+    match a {
+        "acos" => Some(OpAcos),
+        "addf" => Some(OpAddf),
+        "addi" => Some(OpAddi),
+        "apply" => Some(OpApply),
+        "asin" => Some(OpAsin),
+        "clampf" => Some(OpClampf),
+        "cone" => Some(OpCone),
+        "cos" => Some(OpCos),
+        "cube" => Some(OpCube),
+        "cylinder" => Some(OpCylinder),
+        "difference" => Some(OpDifference),
+        "divf" => Some(OpDivf),
+        "divi" => Some(OpDivi),
+        "eqf" => Some(OpEqf),
+        "eqi" => Some(OpEqi),
+        "floor" => Some(OpFloor),
+        "frac" => Some(OpFrac),
+        "get" => Some(OpGet),
+        "getx" => Some(OpGetx),
+        "gety" => Some(OpGety),
+        "getz" => Some(OpGetz),
+        "if" => Some(OpIf),
+        "intersect" => Some(OpIntersect),
+        "length" => Some(OpLength),
+        "lessf" => Some(OpLessf),
+        "lessi" => Some(OpLessi),
+        "light" => Some(OpLight),
+        "modi" => Some(OpModi),
+        "mulf" => Some(OpMulf),
+        "muli" => Some(OpMuli),
+        "negf" => Some(OpNegf),
+        "negi" => Some(OpNegi),
+        "plane" => Some(OpPlane),
+        "point" => Some(OpPoint),
+        "pointlight" => Some(OpPointlight),
+        "real" => Some(OpReal),
+        "render" => Some(OpRender),
+        "rotatex" => Some(OpRotatex),
+        "rotatey" => Some(OpRotatey),
+        "rotatez" => Some(OpRotatez),
+        "scale" => Some(OpScale),
+        "sin" => Some(OpSin),
+        "sphere" => Some(OpSphere),
+        "spotlight" => Some(OpSpotlight),
+        "sqrt" => Some(OpSqrt),
+        "subf" => Some(OpSubf),
+        "subi" => Some(OpSubi),
+        "translate" => Some(OpTranslate),
+        "union" => Some(OpUnion),
+        "uscale" => Some(OpUscale),
+        _ => None
     }
-    None
 }
 
 fn is_operator(a: &str) -> bool {
@@ -229,8 +277,11 @@ fn identifier_tokenizer(a: &str) -> Option<Result> {
 fn operator_tokenizer(a: &str) -> Option<Result> {
     // Same as identifier, but with a reversed check for operator-ness
     match match_identifier(a) {
-        Some(id) if is_operator(id) => {
-            Some(Result(Operator(id.to_owned()), id.len(), true))
+        Some(id) => {
+            match match_operator(id) {
+                Some(op) => Some(Result(Operator(op), id.len(), true)),
+                _ => None
+            }
         }
         _ => None
     }
@@ -241,7 +292,7 @@ fn binder_tokenizer(a: &str) -> Option<Result> {
         match match_identifier(a.slice_from(1)) {
             Some(id) if !is_operator(id) => {
                 Some(Result(Binder(id.to_owned()), id.len() + 1, true))
-            }
+            },
             _ => None  // TODO: maybe raise some error for binding to reserved word
         }
     } else {
@@ -398,60 +449,44 @@ pub fn tokenize(text: &str) -> ~[Token] {
     return tokenlist;
 }
 
-#[cfg(test)]
-mod tests {
-    // TODO: surely there must be an easier way to import stuff?
-    use super::tokenize;
-    use super::Integer;
-    use super::Real;
-    use super::String;
-    use super::Boolean;
-    use super::Identifier;
-    use super::Binder;
-    use super::Operator;
-    use super::BeginArray;
-    use super::EndArray;
-    use super::BeginFunction;
-    use super::EndFunction;
-    #[test]
-    fn test_tokenizer() {
-        assert_eq!(tokenize("1 % apa"), ~[Integer(1)]);
-        assert_eq!(tokenize("1 % apa\n2"), ~[Integer(1), Integer(2)]);
-        assert_eq!(tokenize("1"), ~[Integer(1)]);
-        assert_eq!(tokenize("123"), ~[Integer(123)]);
-        assert_eq!(tokenize("-1"), ~[Integer(-1)]);
-        assert_eq!(tokenize("-123"), ~[Integer(-123)]);
-        assert_eq!(tokenize("1 2"), ~[Integer( 1), Integer(2)]);
-        assert_eq!(tokenize("123 321"), ~[Integer(123), Integer(321)]);
-        assert_eq!(tokenize("-1-1"), ~[Integer(-1), Integer(-1)]);
-        assert_eq!(tokenize("1.0"), ~[Real(1.0)]);
-        assert_eq!(tokenize("-1.0"), ~[Real(-1.0)]);
-        assert_eq!(tokenize("1.0e12"), ~[Real(1.0e12)]);
-        assert_eq!(tokenize("1e12"), ~[Real(1e12)]);
-        assert_eq!(tokenize("1e-12"), ~[Real(1e-12)]);
-        assert_eq!(tokenize("\"test\""), ~[String(~"test")]);
-        assert_eq!(tokenize("true"), ~[Boolean(true)]);
-        assert_eq!(tokenize("false"), ~[Boolean(false)]);
-        assert_eq!(tokenize("/x"), ~[Binder(~"x")]);
-        assert_eq!(tokenize("/x-y_2"), ~[Binder(~"x-y_2")]);
-        assert_eq!(tokenize("x"), ~[Identifier(~"x")]);
-        assert_eq!(tokenize("x-y_2"), ~[Identifier(~"x-y_2")]);
-        assert_eq!(tokenize("addi"), ~[Operator(~"addi")]);
-        assert_eq!(tokenize("addiblaj"), ~[Identifier(~"addiblaj")]);
-        assert_eq!(tokenize("[1 2]"), ~[BeginArray,
+#[test]
+fn test_tokenizer() {
+    assert_eq!(tokenize("1 % apa"), ~[Integer(1)]);
+    assert_eq!(tokenize("1 % apa\n2"), ~[Integer(1), Integer(2)]);
+    assert_eq!(tokenize("1"), ~[Integer(1)]);
+    assert_eq!(tokenize("123"), ~[Integer(123)]);
+    assert_eq!(tokenize("-1"), ~[Integer(-1)]);
+    assert_eq!(tokenize("-123"), ~[Integer(-123)]);
+    assert_eq!(tokenize("1 2"), ~[Integer( 1), Integer(2)]);
+    assert_eq!(tokenize("123 321"), ~[Integer(123), Integer(321)]);
+    assert_eq!(tokenize("-1-1"), ~[Integer(-1), Integer(-1)]);
+    assert_eq!(tokenize("1.0"), ~[Real(1.0)]);
+    assert_eq!(tokenize("-1.0"), ~[Real(-1.0)]);
+    assert_eq!(tokenize("1.0e12"), ~[Real(1.0e12)]);
+    assert_eq!(tokenize("1e12"), ~[Real(1e12)]);
+    assert_eq!(tokenize("1e-12"), ~[Real(1e-12)]);
+    assert_eq!(tokenize("\"test\""), ~[String(~"test")]);
+    assert_eq!(tokenize("true"), ~[Boolean(true)]);
+    assert_eq!(tokenize("false"), ~[Boolean(false)]);
+    assert_eq!(tokenize("/x"), ~[Binder(~"x")]);
+    assert_eq!(tokenize("/x-y_2"), ~[Binder(~"x-y_2")]);
+    assert_eq!(tokenize("x"), ~[Identifier(~"x")]);
+    assert_eq!(tokenize("x-y_2"), ~[Identifier(~"x-y_2")]);
+    assert_eq!(tokenize("addi"), ~[Operator(OpAddi)]);
+    assert_eq!(tokenize("addiblaj"), ~[Identifier(~"addiblaj")]);
+    assert_eq!(tokenize("[1 2]"), ~[BeginArray,
+                                    Integer(1),
+                                    Integer(2),
+                                    EndArray]);
+    assert_eq!(tokenize("{1 2}"), ~[BeginFunction,
+                                    Integer(1),
+                                    Integer(2),
+                                    EndFunction]);
+    assert_eq!(tokenize("{1 [2 3]}"), ~[BeginFunction,
                                         Integer(1),
+                                        BeginArray,
                                         Integer(2),
-                                        EndArray]);
-        assert_eq!(tokenize("{1 2}"), ~[BeginFunction,
-                                        Integer(1),
-                                        Integer(2),
-                                        EndFunction]);
-        assert_eq!(tokenize("{1 [2 3]}"), ~[BeginFunction,
-                                            Integer(1),
-                                            BeginArray,
-                                            Integer(2),
-                                            Integer(3),
-                                            EndArray,
-                                            EndFunction])
-    }
+                                        Integer(3),
+                                        EndArray,
+                                        EndFunction])
 }

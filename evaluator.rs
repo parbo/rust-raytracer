@@ -8,11 +8,21 @@ extern crate collections;
 
 pub mod parser;
 
-type Env = collections::hashmap::HashMap<~str, parser::tokenizer::Token>;
+#[deriving(Eq, Show, Clone)]
+enum Value {
+    ValClosure, // TODO
+    ValArray, // TODO
+    ValBoolean(bool),
+    ValReal(f64),
+    ValInteger(i64),
+    ValString(~str)
+}
+
+type Env = collections::hashmap::HashMap<~str, Value>;
 
 #[deriving(Eq, Show, Clone)]
 enum Stack {
-    Cons(parser::tokenizer::Token, ~Stack),
+    Cons(Value, ~Stack),
     Nil
 }
 
@@ -56,9 +66,9 @@ enum Stack {
 //     assert type(v) == int
 //     return ('Integer', v)
 
-fn get_integer(v: &parser::tokenizer::Token) -> i64 {
+fn get_integer(v: &Value) -> i64 {
     match v {
-        &parser::tokenizer::Integer(i) => i,
+        &ValInteger(i) => i,
         other => fail!("{} is not an integer", other)
     }
 }
@@ -141,11 +151,11 @@ fn get_integer(v: &parser::tokenizer::Token) -> i64 {
 // def push(stack, elem):
 //     return (elem, stack)
 
-fn push(stack: ~Stack, value: parser::tokenizer::Token) -> ~Stack {
+fn push(stack: ~Stack, value: Value) -> ~Stack {
     ~Cons(value, stack)
 }
 
-fn pop(stack: ~Stack) -> Option<(parser::tokenizer::Token, ~Stack)> {
+fn pop(stack: ~Stack) -> Option<(Value, ~Stack)> {
     println!("pop from stack: {}", stack);
     match stack {
         ~Cons(token, rest_of_stack) => {
@@ -163,7 +173,7 @@ fn pop(stack: ~Stack) -> Option<(parser::tokenizer::Token, ~Stack)> {
 //     newenv[key] = value
 //     return newenv
 
-fn add_env(mut env: ~Env, key: ~str, value: parser::tokenizer::Token) -> ~Env {
+fn add_env(mut env: ~Env, key: ~str, value: Value) -> ~Env {
     env.insert(key, value);
     env
 }
@@ -190,7 +200,7 @@ fn add_env(mut env: ~Env, key: ~str, value: parser::tokenizer::Token) -> ~Env {
 fn eval_addi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     let (i2, s1) = pop(stack).unwrap();
     let (i1, s2) = pop(s1).unwrap();
-    (env, push(s2, parser::tokenizer::Integer(get_integer(&i1) + get_integer(&i2))))
+    (env, push(s2, ValInteger(get_integer(&i1) + get_integer(&i2))))
 }
 
 fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
@@ -511,17 +521,17 @@ fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~E
             },
             &parser::Leaf(ref t) => {
                 match t {
-                    &parser::tokenizer::Integer(ref v) => {
-                        stack = push(stack, t.clone())
+                    &parser::tokenizer::Integer(v) => {
+                        stack = push(stack, ValInteger(v))
                     },
-                    &parser::tokenizer::Real(ref v) => {
-//             stack = push(stack, node)
+                    &parser::tokenizer::Real(v) => {
+                        stack = push(stack, ValReal(v))
                     },
-                    &parser::tokenizer::Boolean(ref v) => {
-//             stack = push(stack, node)
+                    &parser::tokenizer::Boolean(v) => {
+                        stack = push(stack, ValBoolean(v))
                     },
                     &parser::tokenizer::String(ref v) => {
-//             stack = push(stack, node)
+                        stack = push(stack, ValString(v.clone()))
                     },
                     &parser::tokenizer::Binder(ref v) => {
                         let (i, s) = pop(stack).unwrap();
@@ -566,7 +576,7 @@ fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~E
 
 fn evaluate(ast: ~[parser::AstNode]) -> (~Env, ~Stack) {
     // Apparently can't call static methods on aliased types, so her goes the full name of Env
-    let env: ~Env = ~collections::hashmap::HashMap::<~str, parser::tokenizer::Token>::new();
+    let env: ~Env = ~collections::hashmap::HashMap::<~str, Value>::new();
     do_evaluate(env, ~Nil, ast)
 }
 
@@ -621,10 +631,10 @@ pub fn run(gml: &str) -> (~Env, ~Stack) {
 fn test_evaluator() {
     let  (env, stack) = run("1 /x");
     println!("env: {}, stack: {}", env, stack);
-    assert_eq!(env.get(&~"x"), &parser::tokenizer::Integer(1));
+    assert_eq!(env.get(&~"x"), &ValInteger(1));
     let  (env, stack) = run("1 2 addi");
     println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, ~Cons(parser::tokenizer::Integer(3), ~Nil));
+    assert_eq!(stack, ~Cons(ValInteger(3), ~Nil));
 //     env, stack, ast = run("true { 1 } { 2 } if")
 //     print stack
 //     env, stack, ast = run("false { 1 } { 2 } if")

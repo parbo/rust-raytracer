@@ -1,16 +1,10 @@
-// import math
-// import primitives
-// import lights
-// import raytracer
-// import copy
-
 extern crate collections;
 
 pub mod parser;
 
 #[deriving(Eq, Show, Clone)]
 enum Value {
-    ValClosure, // TODO
+    ValClosure(~Env, ~[parser::AstNode]), // The ast for the function
     ValArray, // TODO
     ValBoolean(bool),
     ValReal(f64),
@@ -26,33 +20,6 @@ enum Stack {
     Nil
 }
 
-// class GMLRuntimeError(Exception):
-//     pass
-
-// class GMLTypeError(Exception):
-//     pass
-
-// class GMLSubscriptError(Exception):
-//     pass
-
-// def get_type(t):
-//     return t[0]
-
-// def get_value(t):
-//     return t[1]
-
-// def check_type(obj, typename):
-//     return typename == get_type(obj)
-
-// check_integer = lambda t: check_type(t, 'Integer')
-// check_real = lambda t: check_type(t, 'Real')
-// check_boolean = lambda t: check_type(t, 'Boolean')
-// check_closure = lambda t: check_type(t, 'Closure')
-// check_identifier = lambda t: check_type(t, 'Identifier')
-// check_point = lambda t: check_type(t, 'Point')
-// check_array = lambda t: check_type(t, 'Array')
-// check_string = lambda t: check_type(t, 'String')
-
 // def divi(a, b):
 //     rv = a // b
 //     if rv < 0:
@@ -62,10 +29,6 @@ enum Stack {
 // def modi(a, b):
 //     return a - b * divi(a, b)
 
-// def make_integer(v):
-//     assert type(v) == int
-//     return ('Integer', v)
-
 fn get_integer(v: &Value) -> i64 {
     match v {
         &ValInteger(i) => i,
@@ -73,42 +36,26 @@ fn get_integer(v: &Value) -> i64 {
     }
 }
 
-// def make_string(v):
-//     assert type(v) == str
-//     return ('String', v)
+fn get_string(v: &Value) -> ~str {
+    match v {
+        &ValString(ref i) => i.clone(),
+        other => fail!("{} is not an integer", other)
+    }
+}
 
-// def get_string(s):
-//     assert check_string(s)
-//     return get_value(s)
+fn get_real(v: &Value) -> f64 {
+    match v {
+        &ValReal(f) => f,
+        other => fail!("{} is not an real", other)
+    }
+}
 
-// def make_real(v):
-//     assert type(v) == float
-//     return ('Real', v)
-
-// def get_real(r):
-//     assert check_real(r)
-//     return get_value(r)
-
-// def make_boolean(v):
-//     assert type(v) == bool
-//     return ('Boolean', v)
-
-// def get_boolean(b):
-//     assert check_boolean(b)
-//     return get_value(b)
-
-// def make_closure(env, v):
-//     return ('Closure', (env, v[:]))
-
-// def get_closure_env(c):
-//     assert check_closure(c)
-//     closure = get_value(c)
-//     return closure[0]
-
-// def get_closure_function(c):
-//     assert check_closure(c)
-//     closure = get_value(c)
-//     return closure[1]
+fn get_boolean(v: &Value) -> bool {
+    match v {
+        &ValBoolean(b) => b,
+        other => fail!("{} is not an boolean", other)
+    }
+}
 
 // def make_array(v):
 //     tmp = []
@@ -145,75 +92,84 @@ fn get_integer(v: &Value) -> i64 {
 //         raise GMLTypeError
 //     return obj
 
-// def make_stack():
-//     return ()
-
-// def push(stack, elem):
-//     return (elem, stack)
-
 fn push(stack: ~Stack, value: Value) -> ~Stack {
     ~Cons(value, stack)
 }
 
-fn pop(stack: ~Stack) -> Option<(Value, ~Stack)> {
+fn pop(stack: ~Stack) -> (Value, ~Stack) {
     println!("pop from stack: {}", stack);
     match stack {
         ~Cons(token, rest_of_stack) => {
-            Some((token, rest_of_stack))
+            (token, rest_of_stack.clone())
         },
-        ~Nil => None
+        ~Nil => fail!("stack is empty!")
     }
 }
-
-// def make_env():
-//     return {}
-
-// def add_env(env, key, value):
-//     newenv = dict(env)
-//     newenv[key] = value
-//     return newenv
 
 fn add_env(mut env: ~Env, key: ~str, value: Value) -> ~Env {
     env.insert(key, value);
     env
 }
 
-// def get_env(env, key):
-//     return env[key]
+fn get_env<'a>(env: &'a Env, key: &'a ~str) -> &'a Value {
+    env.get(key)
+}
 
-// def eval_if(env, stack):
-//     c2, stack = pop(stack)
-//     c1, stack = pop(stack)
-//     pred, stack = pop(stack)
-//     if get_boolean(pred):
-//         e, s, a = do_evaluate(get_closure_env(c1), stack, get_closure_function(c1))
-//     else:
-//         e, s, a = do_evaluate(get_closure_env(c2), stack, get_closure_function(c2))
-//     return env, s
+fn eval_if(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (c2, s) = pop(stack);
+    let (c1, s) = pop(s);
+    let (pred, s) = pop(s);
+    if get_boolean(&pred) {
+        match c1 {
+            ValClosure(e, f) => {
+                let (e, s) = do_evaluate(e, s, f);
+                (env, s)
+            },
+            _ => fail!("can't use non-function {} as if function", c1)
+        }
+    } else {
+        match c2 {
+            ValClosure(e, f) => {
+                let (e, s) = do_evaluate(e, s, f);
+                (env, s)
+            },
+            _ => fail!("can't use non-function {} as if function", c2)
+        }
+    }
+}
 
-// def eval_apply(env, stack):
-//     c, stack = pop(stack)
-//     assert check_closure(c)
-//     e, s, a = do_evaluate(get_closure_env(c), stack, get_closure_function(c))
-//     return env, s
+fn eval_apply(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (c, s) = pop(stack);
+    match c {
+        ValClosure(e, f) => {
+            let (e, s) = do_evaluate(e, s, f);
+            (env, s)
+        },
+        _ => fail!("can't apply non-function {}", c)
+    }
+}
 
 fn eval_addi(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
-    let (i2, s1) = pop(stack).unwrap();
-    let (i1, s2) = pop(s1).unwrap();
-    (env, push(s2, ValInteger(get_integer(&i1) + get_integer(&i2))))
+    let (i2, s) = pop(stack);
+    let (i1, s) = pop(s);
+    (env, push(s, ValInteger(get_integer(&i1) + get_integer(&i2))))
+}
+
+fn eval_addf(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
+    let (r2, s) = pop(stack);
+    let (r1, s) = pop(s);
+    (env, push(s, ValReal(get_real(&r1) + get_real(&r2))))
 }
 
 fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     match op {
         &parser::tokenizer::OpAddi => eval_addi(env, stack),
+        &parser::tokenizer::OpAddf => eval_addf(env, stack),
+        &parser::tokenizer::OpApply => eval_apply(env, stack),
+        &parser::tokenizer::OpIf => eval_if(env, stack),
         _ => fail!("operator {} not implemented yet!", op)
     }
 }
-
-// def eval_addf(env, stack):
-//     r2, stack = pop(stack)
-//     r1, stack = pop(stack)
-//     return env, push(stack, make_real(get_real(r1)+get_real(r2)))
 
 // def eval_acos(env, stack):
 //     r, stack = pop(stack)
@@ -511,9 +467,8 @@ fn eval(op: &parser::tokenizer::Ops, env: ~Env, stack: ~Stack) -> (~Env, ~Stack)
 fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~Env, ~Stack) {
     for i in range(0, ast.len()) {
         match &ast[i] {
-            &parser::Function(_) => {
-//             c = make_closure(env, v)
-//             stack = push(stack, c)
+            &parser::Function(ref v) => {
+                stack = push(stack, ValClosure(env.clone(), v.clone()));
             },
             &parser::Array(_) => {
 //             e, s, a = do_evaluate(env, make_stack(), v)
@@ -534,18 +489,15 @@ fn do_evaluate(mut env: ~Env, mut stack: ~Stack, ast: &[parser::AstNode]) -> (~E
                         stack = push(stack, ValString(v.clone()))
                     },
                     &parser::tokenizer::Binder(ref v) => {
-                        let (i, s) = pop(stack).unwrap();
+                        let (i, s) = pop(stack);
                         stack = s;
                         env = add_env(env, v.clone(), i);
                     },
                     &parser::tokenizer::Identifier(ref v) => {
-//             try:
-//                 e = get_env(env, v)
-//                 if isinstance(e, primitives.Node):
-//                     e = copy.deepcopy(e)
-//                 stack = push(stack, e)
-//             except KeyError:
-//                 raise GMLRuntimeError
+                        let val = get_env(env, v);
+                        //                 if isinstance(e, primitives.Node):
+                        //                     e = copy.deepcopy(e)
+                        stack = push(stack, val.clone())
                     },
                     &parser::tokenizer::Operator(ref v) => {
                         let (e, s) = eval(v, env, stack);
@@ -584,49 +536,6 @@ pub fn run(gml: &str) -> (~Env, ~Stack) {
     evaluate(parser::parse(parser::tokenizer::tokenize(gml)))
 }
 
-// if __name__=="__main__":
-//     from preprocess import preprocess
-//     from tokenizer import tokenize
-//     from gmlparser import parse, GMLSyntaxError
-//     import sys
-
-//     sys.setrecursionlimit(120000)
-
-//     psyco = (sys.argv[1] == "-p")
-//     if psyco:
-//         files = sys.argv[2:]
-//     else:
-//         files = sys.argv[1:]
-
-
-//     if psyco:
-//         try:
-//             import psyco
-//             psyco.full()
-//             psyco.cannotcompile(do_evaluate)
-//             print "Using psyco"
-//         except ImportError:
-//             print "psyco not installed"
-//             pass
-    
-//     for f in files:
-//         print f
-//         print "=" * len(f)
-//         try:
-//             r = evaluate(parse(tokenize(preprocess(f))))
-//         except GMLSyntaxError:
-//             print "contains syntax errors"
-//         except GMLRuntimeError:
-//             print "runtime error"
-//         except GMLSubscriptError:
-//             print "array index out of range"
-//         except KeyError:
-//             print "contains unimplemented feature"
-//         print
-
-//     if files:
-//         sys.exit(0)
-
 #[test]
 fn test_evaluator() {
     let  (env, stack) = run("1 /x");
@@ -635,13 +544,22 @@ fn test_evaluator() {
     let  (env, stack) = run("1 2 addi");
     println!("env: {}, stack: {}", env, stack);
     assert_eq!(stack, ~Cons(ValInteger(3), ~Nil));
-//     env, stack, ast = run("true { 1 } { 2 } if")
-//     print stack
-//     env, stack, ast = run("false { 1 } { 2 } if")
-//     print stack
+    let  (env, stack) = run("1.5 2.5 addf");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValReal(4.0), ~Nil));
+    let  (env, stack) = run("1 /x x x addi");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValInteger(2), ~Nil));
+    let  (env, stack) = run("1 { /x x x } apply");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValInteger(1), ~Cons(ValInteger(1), ~Nil)));
+    let  (env, stack) = run("true { 1 } { 2 } if");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValInteger(1), ~Nil));
+    let  (env, stack) = run("false { 1 } { 2 } if");
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(stack, ~Cons(ValInteger(2), ~Nil));
 //     env, stack, ast = run("false /b b { 1 } { 2 } if")
-//     print stack
-//     env, stack, ast = run("1 { /x x x } apply")
 //     print stack
 //     env, stack, ast = run("4 /x 2 x addi")
 //     print stack

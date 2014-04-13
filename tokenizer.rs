@@ -1,7 +1,6 @@
 extern crate std;
 
-#[deriving(Eq)]
-#[deriving(Show)]
+#[deriving(Eq, Show, Clone)]
 pub enum Token {
     Whitespace,
     Comment,
@@ -16,10 +15,6 @@ pub enum Token {
     Real(f64),
     Integer(i64),
     String(~str),
-    // Below are used by the parser
-    Program,
-    Function,
-    Array
 }
 
 struct Result(Token, uint, bool);

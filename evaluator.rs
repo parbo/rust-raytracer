@@ -121,7 +121,7 @@ fn eval_if(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     if get_boolean(&pred) {
         match c1 {
             ValClosure(e, f) => {
-                let (e, s) = do_evaluate(e, s, f);
+                let (_, s) = do_evaluate(e, s, f);
                 (env, s)
             },
             _ => fail!("can't use non-function {} as if function", c1)
@@ -129,7 +129,7 @@ fn eval_if(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     } else {
         match c2 {
             ValClosure(e, f) => {
-                let (e, s) = do_evaluate(e, s, f);
+                let (_, s) = do_evaluate(e, s, f);
                 (env, s)
             },
             _ => fail!("can't use non-function {} as if function", c2)
@@ -141,7 +141,7 @@ fn eval_apply(env: ~Env, stack: ~Stack) -> (~Env, ~Stack) {
     let (c, s) = pop(stack);
     match c {
         ValClosure(e, f) => {
-            let (e, s) = do_evaluate(e, s, f);
+            let (_, s) = do_evaluate(e, s, f);
             (env, s)
         },
         _ => fail!("can't apply non-function {}", c)
@@ -559,6 +559,10 @@ fn test_evaluator() {
     let  (env, stack) = run("1 /x");
     println!("env: {}, stack: {}", env, stack);
     assert_eq!(env.get(&~"x"), &ValInteger(1));
+    let  (env, stack) = run(r#""apa" /x"#);
+    println!("env: {}, stack: {}", env, stack);
+    assert_eq!(env.get(&~"x"), &ValString(~"apa"));
+    assert_eq!(get_string(env.get(&~"x")), ~"apa");
     let  (env, stack) = run("1 2 addi");
     println!("env: {}, stack: {}", env, stack);
     assert_eq!(stack, ~Cons(ValInteger(3), ~Nil));

@@ -1,6 +1,8 @@
+#![allow(unstable)]
+
 use std;
 
-#[deriving(Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Ops {
     OpAcos,
     OpAddf,
@@ -54,7 +56,7 @@ pub enum Ops {
     OpUscale
 }
 
-#[deriving(Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Token {
     Whitespace,
     Comment,
@@ -71,7 +73,7 @@ pub enum Token {
     Str(String),
 }
 
-struct Result(Token, uint, bool);
+struct Result(Token, usize, bool);
 
 fn whitespace_tokenizer(a: &str) -> Option<Result> {
     let mut consumed = 0;
@@ -258,7 +260,7 @@ fn match_identifier<'a>(a: &'a str) -> Option<&'a str> {
         }
         match consumed {
             0 => None,
-            _ => Some(a.slice(0, consumed))
+            _ => Some(&a[0..consumed])
         }
     } else {
         None
@@ -268,7 +270,7 @@ fn match_identifier<'a>(a: &'a str) -> Option<&'a str> {
 fn identifier_tokenizer(a: &str) -> Option<Result> {
     match match_identifier(a) {
         Some(id) if !is_operator(id) => {
-            Some(Result(Token::Identifier(id.to_owned()), id.len(), true))
+            Some(Result(Token::Identifier(String::from_str(id)), id.len(), true))
         }
         _ => None
     }
@@ -289,9 +291,9 @@ fn operator_tokenizer(a: &str) -> Option<Result> {
 
 fn binder_tokenizer(a: &str) -> Option<Result> {
     if a.char_at(0) == '/' && a.len() > 1 {
-        match match_identifier(a.slice_from(1)) {
+        match match_identifier(&a[1..]) {
             Some(id) if !is_operator(id) => {
-                Some(Result(Token::Binder(id.to_owned()), id.len() + 1, true))
+                Some(Result(Token::Binder(String::from_str(id)), id.len() + 1, true))
             },
             _ => None  // TODO: maybe raise some error for binding to reserved word
         }
@@ -300,7 +302,7 @@ fn binder_tokenizer(a: &str) -> Option<Result> {
     }
 }
 
-fn eat_digits(a: &str) -> uint {
+fn eat_digits(a: &str) -> usize {
     let mut consumed = 0;
     for (offset, char) in a.char_indices() {
         if is_decimal_number(char) {
@@ -322,7 +324,7 @@ fn real_tokenizer(a: &str) -> Option<Result> {
         }
     }
     // Eat digits
-    let digits = eat_digits(a.slice_from(consumed));
+    let digits = eat_digits(&a[consumed..]);
     if digits == 0 {
         return None;
     }
@@ -336,7 +338,7 @@ fn real_tokenizer(a: &str) -> Option<Result> {
         if a.len() == consumed {
             return None;
         }
-        let decimals = eat_digits(a.slice_from(consumed));
+        let decimals = eat_digits(&a[consumed..]);
         if decimals == 0 {
             return None;
         }
@@ -361,14 +363,14 @@ fn real_tokenizer(a: &str) -> Option<Result> {
             }
         }
         // Eat exponent digits
-        let exponent_digits = eat_digits(a.slice_from(consumed));
+        let exponent_digits = eat_digits(&a[consumed..]);
         if exponent_digits == 0 {
             return None;
         }
         consumed += exponent_digits;
     }
     // If we've come this far, everything is a-ok
-    return Some(Result(Token::Real(a.slice(0, consumed).parse().unwrap()), consumed, true));
+    return Some(Result(Token::Real(a[0..consumed].parse().unwrap()), consumed, true));
 }
 
 fn integer_tokenizer(a: &str) -> Option<Result> {
@@ -378,7 +380,7 @@ fn integer_tokenizer(a: &str) -> Option<Result> {
         pos += 1;
     }
     let mut consumed = 0;
-    for (offset, char) in a.slice_from(pos).char_indices() {
+    for (offset, char) in a[pos..].char_indices() {
         if is_decimal_number(char) {
             consumed = offset + 1;
         } else {
@@ -387,14 +389,14 @@ fn integer_tokenizer(a: &str) -> Option<Result> {
     }
     match consumed {
         0 => None,
-        _ => Some(Result(Token::Integer(a.slice(0, pos + consumed).parse().unwrap()), pos + consumed, true))
+        _ => Some(Result(Token::Integer(a[0..(pos + consumed)].parse().unwrap()), pos + consumed, true))
     }
 }
 
 fn string_tokenizer(a: &str) -> Option<Result> {
     if a.char_at(0) == '"' && a.len() > 1 {
         let mut consumed = 0;
-        for (offset, char) in a.slice_from(1).char_indices() {
+        for (offset, char) in a[1..].char_indices() {
             if char == '"' {
                 break;
             } else {
@@ -403,15 +405,15 @@ fn string_tokenizer(a: &str) -> Option<Result> {
         }
         match consumed {
             0 => None,
-            _ => Some(Result(Token::Str(a.slice(1, consumed + 1).to_owned()), consumed + 2, true)),  // Add 2 for the "'s
+            _ => Some(Result(Token::Str(String::from_str(&a[1..(consumed + 1)])), consumed + 2, true)),  // Add 2 for the "'s
         }
     } else {
         None
     }
 }
 
-pub fn tokenize(text: &str) -> Box<[Token]> {
-    let tokenizers = [whitespace_tokenizer,
+pub fn tokenize(text: &str) -> Vec<Token> {
+    let tokenizers : [fn(&str) -> Option<Result>; 13] = [whitespace_tokenizer,
                       comment_tokenizer,
                       begin_function_tokenizer,
                       end_function_tokenizer,
@@ -425,12 +427,12 @@ pub fn tokenize(text: &str) -> Box<[Token]> {
                       integer_tokenizer,
                       string_tokenizer];
 
-    let mut tokenlist: Box<[Token]> = Box::new([]);
-    let mut pos: uint = 0;
+    let mut tokenlist = Vec::<Token>::new();
+    let mut pos: usize = 0;
     loop {
         let last_pos = pos;
         for &tokenizer in tokenizers.iter() {
-            match tokenizer(text.slice(pos, text.len())) {
+            match tokenizer(&text[pos..]) {
                 Some(Result(token, consumed, emit)) => {
                     if emit {
                         tokenlist.push(token)
@@ -451,42 +453,42 @@ pub fn tokenize(text: &str) -> Box<[Token]> {
 
 #[test]
 fn test_tokenizer() {
-    assert_eq!(tokenize("1 % apa"), Box::new([Integer(1)]));
-    assert_eq!(tokenize("1 % apa\n2"), Box::new([Integer(1), Integer(2)]));
-    assert_eq!(tokenize("1"), Box::new([Integer(1)]));
-    assert_eq!(tokenize("123"), Box::new([Integer(123)]));
-    assert_eq!(tokenize("-1"), Box::new([Integer(-1)]));
-    assert_eq!(tokenize("-123"), Box::new([Integer(-123)]));
-    assert_eq!(tokenize("1 2"), Box::new([Integer( 1), Integer(2)]));
-    assert_eq!(tokenize("123 321"), Box::new([Integer(123), Integer(321)]));
-    assert_eq!(tokenize("-1-1"), Box::new([Integer(-1), Integer(-1)]));
-    assert_eq!(tokenize("1.0"), Box::new([Real(1.0)]));
-    assert_eq!(tokenize("-1.0"), Box::new([Real(-1.0)]));
-    assert_eq!(tokenize("1.0e12"), Box::new([Real(1.0e12)]));
-    assert_eq!(tokenize("1e12"), Box::new([Real(1e12)]));
-    assert_eq!(tokenize("1e-12"), Box::new([Real(1e-12)]));
-    assert_eq!(tokenize("\"test\""), Box::new([String("test")]));
-    assert_eq!(tokenize("true"), Box::new([Boolean(true)]));
-    assert_eq!(tokenize("false"), Box::new([Boolean(false)]));
-    assert_eq!(tokenize("/x"), Box::new([Binder("x")]));
-    assert_eq!(tokenize("/x-y_2"), Box::new([Binder("x-y_2")]));
-    assert_eq!(tokenize("x"), Box::new([Identifier("x")]));
-    assert_eq!(tokenize("x-y_2"), Box::new([Identifier("x-y_2")]));
-    assert_eq!(tokenize("addi"), Box::new([Operator(OpAddi)]));
-    assert_eq!(tokenize("addiblaj"), Box::new([Identifier("addiblaj")]));
-    assert_eq!(tokenize("[1 2]"), Box::new([BeginArray,
-                                    Integer(1),
-                                    Integer(2),
-                                    EndArray]));
-    assert_eq!(tokenize("{1 2}"), Box::new([BeginFunction,
-                                    Integer(1),
-                                    Integer(2),
-                                    EndFunction]));
-    assert_eq!(tokenize("{1 [2 3]}"), Box::new([BeginFunction,
-                                        Integer(1),
-                                        BeginArray,
-                                        Integer(2),
-                                        Integer(3),
-                                        EndArray,
-                                        EndFunction]))
+    assert_eq!(tokenize("1 % apa"), [Token::Integer(1)]);
+    assert_eq!(tokenize("1 % apa\n2"), [Token::Integer(1), Token::Integer(2)]);
+    assert_eq!(tokenize("1"), [Token::Integer(1)]);
+    assert_eq!(tokenize("123"), [Token::Integer(123)]);
+    assert_eq!(tokenize("-1"), [Token::Integer(-1)]);
+    assert_eq!(tokenize("-123"), [Token::Integer(-123)]);
+    assert_eq!(tokenize("1 2"), [Token::Integer( 1), Token::Integer(2)]);
+    assert_eq!(tokenize("123 321"), [Token::Integer(123), Token::Integer(321)]);
+    assert_eq!(tokenize("-1-1"), [Token::Integer(-1), Token::Integer(-1)]);
+    assert_eq!(tokenize("1.0"), [Token::Real(1.0)]);
+    assert_eq!(tokenize("-1.0"), [Token::Real(-1.0)]);
+    assert_eq!(tokenize("1.0e12"), [Token::Real(1.0e12)]);
+    assert_eq!(tokenize("1e12"), [Token::Real(1e12)]);
+    assert_eq!(tokenize("1e-12"), [Token::Real(1e-12)]);
+    assert_eq!(tokenize("\"test\""), [Token::Str(String::from_str("test"))]);
+    assert_eq!(tokenize("true"), [Token::Boolean(true)]);
+    assert_eq!(tokenize("false"), [Token::Boolean(false)]);
+    assert_eq!(tokenize("/x"), [Token::Binder(String::from_str("x"))]);
+    assert_eq!(tokenize("/x-y_2"), [Token::Binder(String::from_str("x-y_2"))]);
+    assert_eq!(tokenize("x"), [Token::Identifier(String::from_str("x"))]);
+    assert_eq!(tokenize("x-y_2"), [Token::Identifier(String::from_str("x-y_2"))]);
+    assert_eq!(tokenize("addi"), [Token::Operator(Ops::OpAddi)]);
+    assert_eq!(tokenize("addiblaj"), [Token::Identifier(String::from_str("addiblaj"))]);
+    assert_eq!(tokenize("[1 2]"), [Token::BeginArray,
+                                    Token::Integer(1),
+                                    Token::Integer(2),
+                                    Token::EndArray]);
+    assert_eq!(tokenize("{1 2}"), [Token::BeginFunction,
+                                    Token::Integer(1),
+                                    Token::Integer(2),
+                                    Token::EndFunction]);
+    assert_eq!(tokenize("{1 [2 3]}"), [Token::BeginFunction,
+                                        Token::Integer(1),
+                                        Token::BeginArray,
+                                        Token::Integer(2),
+                                        Token::Integer(3),
+                                        Token::EndArray,
+                                        Token::EndFunction])
 }

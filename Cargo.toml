@@ -1,0 +1,5 @@
+[package]
+
+name = "rust-raytracer"
+version = "0.0.1"
+authors = ["Pär Bohrarper <par.bohrarper@gmail.com>"]

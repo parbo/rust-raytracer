@@ -1,4 +1,4 @@
-//mod evaluator;
+mod evaluator;
 mod parser;
 mod tokenizer;
 

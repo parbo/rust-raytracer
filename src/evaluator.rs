@@ -14,7 +14,7 @@ enum Value {
 
 type Env = collections::HashMap<String, Value>;
 
-fn eval_op<'a>(&op: tokenizer::Ops, env: &'a Env, stack: Box<Stack>) -> (&'a Env, Box<Stack>) {
+fn eval_op<'a>(op: &tokenizer::Ops, env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     match op {
         &tokenizer::Ops::OpAddi => eval_addi(env, stack),
         &tokenizer::Ops::OpAddf => eval_addf(env, stack),
@@ -119,63 +119,63 @@ fn push(stack: Box<Stack>, value: Value) -> Box<Stack> {
 
 fn pop(stack: Box<Stack>) -> (Value, Box<Stack>) {
     match *stack {
-        Stack::Cons(token, rest_of_stack) => {
-            (token, rest_of_stack.clone())
+        Stack::Cons(ref token, ref rest_of_stack) => {
+            (token.clone(), rest_of_stack.clone())
         },
         Stack::Nil => panic!("stack is empty!")
     }
 }
 
-fn add_env<'a>(mut env: &'a Env, key: &str, value: Value) -> &'a Env {
+fn add_env(mut env: Box<Env>, key: &str, value: Value) -> Box<Env> {
     env.insert(key.to_string(), value);
     env
 }
 
 fn get_env<'a>(env: &'a Env, key: &str) -> &'a Value {
-    env.get(key)
+    env.get(&key.to_string()).unwrap()
 }
 
-fn eval_if(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_if(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (c2, s) = pop(stack);
     let (c1, s) = pop(s);
     let (pred, s) = pop(s);
     if get_boolean(&pred) {
         match c1 {
             Value::ValClosure(e, f) => {
-                let (_, s) = do_evaluate(e, s, f);
+                let (_, s) = do_evaluate(e, s, f.as_slice());
                 (env, s)
             },
-            _ => panic!("can't use non-function {} as if function", c1)
+            _ => panic!("can't use non-function {:?} as if function", c1)
         }
     } else {
         match c2 {
             Value::ValClosure(e, f) => {
-                let (_, s) = do_evaluate(e, s, f);
+                let (_, s) = do_evaluate(e, s, f.as_slice());
                 (env, s)
             },
-            _ => panic!("can't use non-function {} as if function", c2)
+            _ => panic!("can't use non-function {:?} as if function", c2)
         }
     }
 }
 
-fn eval_apply(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_apply(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (c, s) = pop(stack);
     match c {
         Value::ValClosure(e, f) => {
-            let (_, s) = do_evaluate(e, s, f);
+            let (_, s) = do_evaluate(e, s, f.as_slice());
             (env, s)
         },
-        _ => panic!("can't apply non-function {}", c)
+        _ => panic!("can't apply non-function {:?}", c)
     }
 }
 
-fn eval_addi(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_addi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
     let (i1, s) = pop(s);
     (env, push(s, Value::ValInteger(get_integer(&i1) + get_integer(&i2))))
 }
 
-fn eval_addf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_addf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r2, s) = pop(stack);
     let (r1, s) = pop(s);
     (env, push(s, Value::ValReal(get_real(&r1) + get_real(&r2))))
@@ -216,14 +216,14 @@ fn eval_addf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
 //     rv = get_real(r1) / get_real(r2)
 //     return env, push(stack, make_real(rv))
 
-fn eval_eqi(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_eqi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
     let (i1, s) = pop(s);
     let rv = get_integer(&i1) == get_integer(&i2);
     (env, push(s, Value::ValBoolean(rv)))
 }
 
-fn eval_eqf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_eqf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r2, s) = pop(stack);
     let (r1, s) = pop(s);
     let rv = get_real(&r1) == get_real(&r2);
@@ -238,7 +238,7 @@ fn eval_eqf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
 //     r, stack = pop(stack)
 //     return env, push(stack, make_real(math.modf(get_real(r))[0]))
 
-fn eval_lessi(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_lessi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
     let (i1, s) = pop(s);
     if get_integer(&i1) < get_integer(&i2) {
@@ -248,7 +248,7 @@ fn eval_lessi(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
     }
 }
 
-fn eval_lessf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_lessf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r2, s) = pop(stack);
     let (r1, s) = pop(s);
     if get_real(&r1) < get_real(&r2) {
@@ -262,24 +262,24 @@ fn eval_lessf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
 //     i1, stack = pop(stack)
 //     return env, push(stack, make_integer(modi(get_integer(i1), get_integer(i2))))
 
-fn eval_muli(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_muli(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
     let (i1, s) = pop(s);
     (env, push(s, Value::ValInteger(get_integer(&i1) * get_integer(&i2))))
 }
 
-fn eval_mulf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_mulf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r2, s) = pop(stack);
     let (r1, s) = pop(s);
     (env, push(s, Value::ValReal(get_real(&r1) * get_real(&r2))))
 }
 
-fn eval_negi(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_negi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i, s) = pop(stack);
     (env, push(s, Value::ValInteger(-get_integer(&i))))
 }
 
-fn eval_negf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_negf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r, s) = pop(stack);
     (env, push(s, Value::ValReal(-get_real(&r))))
 }
@@ -299,13 +299,13 @@ fn eval_negf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
 //     r, stack = pop(stack)
 //     return env, push(stack, make_real(math.sqrt(get_real(r))))
 
-fn eval_subi(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_subi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
     let (i1, s) = pop(s);
     (env, push(s, Value::ValInteger(get_integer(&i1) - get_integer(&i2))))
 }
 
-fn eval_subf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
+fn eval_subf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r2, s) = pop(stack);
     let (r1, s) = pop(s);
     (env, push(s, Value::ValReal(get_real(&r1) - get_real(&r2))))
@@ -481,7 +481,7 @@ fn eval_subf(env: &Env, stack: Box<Stack>) -> (&Env, Box<Stack>) {
 //         return get_point(sc), get_real(kd), get_real(ks), get_real(n)
 //     return do_surface
 
-fn do_evaluate<'a>(mut env: &'a Env, mut stack: Box<Stack>, ast: &[parser::AstNode]) -> (&'a Env, Box<Stack>) {
+fn do_evaluate(mut env: Box<Env>, mut stack: Box<Stack>, ast: &[parser::AstNode]) -> (Box<Env>, Box<Stack>) {
     for i in range(0, ast.len()) {
         match &ast[i] {
             &parser::AstNode::Function(ref v) => {
@@ -508,10 +508,10 @@ fn do_evaluate<'a>(mut env: &'a Env, mut stack: Box<Stack>, ast: &[parser::AstNo
                     &tokenizer::Token::Binder(ref v) => {
                         let (i, s) = pop(stack);
                         stack = s;
-                        env = add_env(env, v.clone(), i);
+                        env = add_env(env, v.as_slice(), i);
                     },
                     &tokenizer::Token::Identifier(ref v) => {
-                        let val = get_env(env, v);
+                        let val = get_env(&*env, v.as_slice());
                         //                 if isinstance(e, primitives.Node):
                         //                     e = copy.deepcopy(e)
                         stack = push(stack, val.clone())
@@ -522,7 +522,7 @@ fn do_evaluate<'a>(mut env: &'a Env, mut stack: Box<Stack>, ast: &[parser::AstNo
                         stack = s;
                     },
                     token => {
-                        panic!("evaluate error, unknown token: {}", token);
+                        panic!("evaluate error, unknown token: {:?}", token);
                     }
                 }
             }
@@ -543,85 +543,85 @@ fn do_evaluate<'a>(mut env: &'a Env, mut stack: Box<Stack>, ast: &[parser::AstNo
 //         if type(res) != type or not isinstance(e, res):
 //             raise
 
-fn evaluate(ast: Box<[parser::AstNode]>) -> (Box<Env>, Box<Stack>) {
+fn evaluate(ast: &[parser::AstNode]) -> (Box<Env>, Box<Stack>) {
     // Apparently can't call static methods on aliased types, so her goes the full name of Env
-    let env: Box<Env> = collections::HashMap::<&str, Value>::new();
-    do_evaluate(env, Box::new(Stack::Nil, ast))
+    let env: Box<Env> = Box::new(collections::HashMap::<String, Value>::new());
+    do_evaluate(env, Box::new(Stack::Nil), ast.as_slice())
 }
 
 pub fn run(gml: &str) -> (Box<Env>, Box<Stack>) {
-    evaluate(parser::parse(tokenizer::tokenize(gml)))
+    evaluate(parser::parse(tokenizer::tokenize(gml).as_slice()).as_slice())
 }
 
 #[test]
 fn test_evaluator() {
     let  (env, stack) = run("1 /x");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(env.get("x"), &Value::ValInteger(1));
+    println!("env: {:?}, stack: {:?}", *env, *stack);
+    assert_eq!(env.get("x").unwrap(), &Value::ValInteger(1));
     let  (env, stack) = run(r#""apa" /x"#);
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(env.get("x"), &Value::ValString("apa"));
-    assert_eq!(get_string(env.get("x")), "apa");
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
+    assert_eq!(get_string(env.get("x").unwrap()), "apa".to_string());
     let  (env, stack) = run("1 2 addi");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(3), Box::new(Stack::Nil))));
     let  (env, stack) = run("1.5 2.5 addf");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     assert_eq!(stack, Box::new(Stack::Cons(Value::ValReal(4.0), Box::new(Stack::Nil))));
     let  (env, stack) = run("1 /x x x addi");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(2), Box::new(Stack::Nil))));
     let  (env, stack) = run("1 { /x x x } apply");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(1), Box::new(Stack::Cons(Value::ValInteger(1), Box::new(Stack::Nil))))));
     let  (env, stack) = run("true { 1 } { 2 } if");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(1)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(1), Box::new(Stack::Nil))));
     let  (env, stack) = run("false { 1 } { 2 } if");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(2)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(2), Box::new(Stack::Nil))));
     let  (env, stack) = run("1 2 eqi");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false), Box::new(Stack::Nil))));
     let  (env, stack) = run("5 5 eqi");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true), Box::new(Stack::Nil))));
     let  (env, stack) = run("1.5 2.7 eqf");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false), Box::new(Stack::Nil))));
     let  (env, stack) = run("5.123 5.123 eqf");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true), Box::new(Stack::Nil))));
     let  (env, stack) = run("2 1 lessi");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false), Box::new(Stack::Nil))));
     let  (env, stack) = run("2 2 lessi");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false), Box::new(Stack::Nil))));
     let  (env, stack) = run("1 2 lessi");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true), Box::new(Stack::Nil))));
     let  (env, stack) = run("2.0 1.0 lessf");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false), Box::new(Stack::Nil))));
     let  (env, stack) = run("2.0 2.0 lessf");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(false), Box::new(Stack::Nil))));
     let  (env, stack) = run("1.0 2.0 lessf");
-    println!("env: {}, stack: {}", env, stack);
-    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true)), Box::new(Stack::Nil)));
+    println!("env: {:?}, stack: {:?}", env, stack);
+    assert_eq!(stack, Box::new(Stack::Cons(Value::ValBoolean(true), Box::new(Stack::Nil))));
     let  (env, stack) = run("false /b b { 1 } { 2 } if");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("4 /x 2 x addi");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("1 { /x x x } apply addi");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("{ /x /y x y } /swap 3 4 swap apply");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact apply");
-    println!("env: {}, stack: {}", env, stack);
+    println!("env: {:?}, stack: {:?}", env, stack);
 //     for u in range(10):
 //         for v in range(10):
 //             prog = """1 /col1 2 /col2 %f /u %f /v { /y /x x x mulf y y mulf addf sqrt } /dist

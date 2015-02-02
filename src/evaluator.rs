@@ -1,5 +1,7 @@
 use std::collections;
 use parser;
+use std::num::Float;
+use std::ops::Rem;
 use tokenizer;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -19,15 +21,20 @@ fn eval_op<'a>(op: &tokenizer::Ops, env: Box<Env>, stack: Box<Stack>) -> (Box<En
         &tokenizer::Ops::OpAddi => eval_addi(env, stack),
         &tokenizer::Ops::OpAddf => eval_addf(env, stack),
         &tokenizer::Ops::OpApply => eval_apply(env, stack),
+        &tokenizer::Ops::OpAsin => eval_asin(env, stack),
+        &tokenizer::Ops::OpDivf => eval_divf(env, stack),
         &tokenizer::Ops::OpEqi => eval_eqi(env, stack),
         &tokenizer::Ops::OpEqf => eval_eqf(env, stack),
+        &tokenizer::Ops::OpFloor => eval_floor(env, stack),
         &tokenizer::Ops::OpIf => eval_if(env, stack),
         &tokenizer::Ops::OpLessi => eval_lessi(env, stack),
         &tokenizer::Ops::OpLessf => eval_lessf(env, stack),
+        &tokenizer::Ops::OpModi => eval_modi(env, stack),
         &tokenizer::Ops::OpMuli => eval_muli(env, stack),
         &tokenizer::Ops::OpMulf => eval_mulf(env, stack),
         &tokenizer::Ops::OpNegi => eval_negi(env, stack),
         &tokenizer::Ops::OpNegf => eval_negf(env, stack),
+        &tokenizer::Ops::OpSqrt => eval_sqrt(env, stack),
         &tokenizer::Ops::OpSubi => eval_subi(env, stack),
         &tokenizer::Ops::OpSubf => eval_subf(env, stack),
         _ => panic!("operator {:?} not implemented yet!", op)
@@ -41,14 +48,13 @@ enum Stack {
     Nil
 }
 
-// def divi(a, b):
-//     rv = a // b
-//     if rv < 0:
-//         rv += 1 # we need to round towards zero, which python doesn't
-//     return rv
+fn divi(a: i64, b: i64) -> i64 {
+    ((a as f64) / (b as f64)).round() as i64
+}
 
-// def modi(a, b):
-//     return a - b * divi(a, b)
+fn modi(a: i64, b: i64) -> i64 {
+    a - b * divi(a, b)
+}
 
 fn get_integer(v: &Value) -> i64 {
     match v {
@@ -185,9 +191,10 @@ fn eval_addf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
 //     r, stack = pop(stack)
 //     return env, push(stack, make_real(math.degrees(math.acos(get_real(r)))))
     
-// def eval_asin(env, stack):
-//     r, stack = pop(stack)
-//     return env, push(stack, make_real(math.degrees(math.asin(get_real(r)))))
+fn eval_asin(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    (env, push(s, Value::ValReal(get_real(&r).asin().to_degrees())))
+}
 
 // def eval_clampf(env, stack):
 //     r, stack = pop(stack)
@@ -210,11 +217,11 @@ fn eval_addf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
 //     i1, stack = pop(stack)
 //     return env, push(stack, make_integer(divi(get_integer(i1), get_integer(i2))))
 
-// def eval_divf(env, stack):
-//     r2, stack = pop(stack)
-//     r1, stack = pop(stack)
-//     rv = get_real(r1) / get_real(r2)
-//     return env, push(stack, make_real(rv))
+fn eval_divf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r2, s) = pop(stack);
+    let (r1, s) = pop(s);
+    (env, push(s, Value::ValReal(get_real(&r1) / get_real(&r2))))
+}
 
 fn eval_eqi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
@@ -230,9 +237,10 @@ fn eval_eqf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     (env, push(s, Value::ValBoolean(rv)))
 }
 
-// def eval_floor(env, stack):
-//     r, stack = pop(stack)
-//     return env, push(stack, make_integer(int(math.floor(get_real(r)))))
+fn eval_floor(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    (env, push(s, Value::ValInteger(get_real(&r).floor() as i64)))
+}
 
 // def eval_frac(env, stack):
 //     r, stack = pop(stack)
@@ -257,10 +265,12 @@ fn eval_lessf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
         (env, push(s, Value::ValBoolean(false)))
     }
 }
-// def eval_modi(env, stack):
-//     i2, stack = pop(stack)
-//     i1, stack = pop(stack)
-//     return env, push(stack, make_integer(modi(get_integer(i1), get_integer(i2))))
+
+fn eval_modi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (i2, s) = pop(stack);
+    let (i1, s) = pop(s);
+    (env, push(s, Value::ValInteger(modi(get_integer(&i1), get_integer(&i2)))))
+}
 
 fn eval_muli(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
@@ -295,9 +305,10 @@ fn eval_negf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
 //         res = 0.0
 //     return env, push(stack, make_real(res))
 
-// def eval_sqrt(env, stack):
-//     r, stack = pop(stack)
-//     return env, push(stack, make_real(math.sqrt(get_real(r))))
+fn eval_sqrt(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    (env, push(s, Value::ValReal(get_real(&r).sqrt())))
+}
 
 fn eval_subi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
@@ -622,33 +633,50 @@ fn test_evaluator() {
     println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact apply");
     println!("env: {:?}, stack: {:?}", env, stack);
-//     for u in range(10):
-//         for v in range(10):
-//             prog = """1 /col1 2 /col2 %f /u %f /v { /y /x x x mulf y y mulf addf sqrt } /dist
-//             { 
-//             u 0.5 subf /u v 0.5 subf /v
-//             u u v dist apply divf /b
-//             0.0 v lessf { b asin } { 360.0 b asin subf } if 180.0 addf 30.0 divf
-//             floor 2 modi 1 eqi { col1 } { col2 } if
-//             } apply"""%(u / 10.0, v / 10.0)
-//             def test(u, v):
-//                 u = u - 0.5
-//                 v = v - 0.5
-//                 b = u / (math.sqrt(u*u+v*v))
-//                 if 0.0 < v:
-//                     c = math.degrees(math.asin(b))
-//                 else:
-//                     c = 360 - math.degrees(math.asin(b))
-//                 c = c + 180.8
-//                 c = c / 30.0
-//                 c = math.floor(c)
-//                 c = modi(c, 2)
-//                 if c == 1:
-//                     print 1,
-//                 else:
-//                     print 2,
-//             #test(u / 10.0, v / 10.0)
-//             env, stack, ast = run(prog)
-//             print stack,
-//         print
+    for ui in range(0, 10) {
+        for vi in range(0, 10) {
+            let u = ui as f64;
+            let v = vi as f64;
+            // Implement a small program
+            // Escaping { in format strings is done by adding an extra brace -> {{
+            let prog = format!("1 /col1 2 /col2 {:.1} /u {:.1} /v {{ /y /x x x mulf y y mulf addf sqrt }} /dist \n \
+            {{ \n \
+            u 0.5 subf /u v 0.5 subf /v \n \
+            u u v dist apply divf /b \n \
+            0.0 v lessf {{ b asin }} {{ 360.0 b asin subf }} if 180.0 addf 30.0 divf \n \
+            floor 2 modi 1 eqi {{ col1 }} {{ col2 }} if \n \
+            }} apply", u / 10.0, v / 10.0);
+            // Implement the same program in rust:
+            fn test(u: f64, v: f64) -> i64 {
+                let u = u - 0.5;
+                let v = v - 0.5;
+                let b = u / (u * u + v * v).sqrt();
+                let mut c: f64;
+                if 0.0 < v {
+                    c = b.asin().to_degrees();
+                } else {
+                    c = 360.0 - b.asin().to_degrees();
+                }
+                c = c + 180.0;
+                c = c / 30.0;
+                let mut ci = c.floor() as i64;
+                ci = modi(ci, 2);
+                if (ci == 1) {
+                    return 1;
+                } else {
+                    return 2;
+                }
+            }
+            // Compare results (which should be the only thing om the top of the stack)
+            let expected = test(u / 10.0, v / 10.0);
+            let (env, stack) = run(prog.as_slice());
+            match *stack {
+                Stack::Cons(ref val, ref rest) => {
+                    assert_eq!(get_integer(&val), expected);
+                    assert_eq!(**rest, Stack::Nil);
+                },
+                _ => panic!()
+            }
+        }
+    }
 }

@@ -78,7 +78,7 @@ struct Result(Token, usize, bool);
 fn whitespace_tokenizer(a: &str) -> Option<Result> {
     let mut consumed = 0;
     for (offset, char) in a.char_indices() {
-        if std::char::CharExt::is_whitespace(char) {
+        if char.is_whitespace() {
             consumed = offset + 1;
         } else {
             break;
@@ -91,26 +91,25 @@ fn whitespace_tokenizer(a: &str) -> Option<Result> {
 }
 
 fn comment_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == '%' {
-        let mut consumed = 0;
-        for (offset, char) in a.char_indices() {
-            if char == '\n' {
-                break;
-            } else {
-                consumed = offset + 1;
-            }
+    let mut consumed = 0;
+    for (offset, char) in a.char_indices() {
+        if offset == 0 && char == '%' {
+            return None;
         }
-        match consumed {
-            0 => None,
-            _ => Some(Result(Token::Comment, consumed, false)),
+        if char == '\n' {
+            break;
+        } else {
+            consumed = offset + 1;
         }
-    } else {
-        None
+    }
+    match consumed {
+        0 => None,
+        _ => Some(Result(Token::Comment, consumed, false)),
     }
 }
 
 fn begin_function_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == '{' {
+    if a.chars().next().unwrap() == '{' {
         Some(Result(Token::BeginFunction, 1, true))
     } else {
         None
@@ -118,7 +117,7 @@ fn begin_function_tokenizer(a: &str) -> Option<Result> {
 }
 
 fn end_function_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == '}' {
+    if a.chars().next().unwrap() == '}' {
         Some(Result(Token::EndFunction, 1, true))
     } else {
         None
@@ -126,7 +125,7 @@ fn end_function_tokenizer(a: &str) -> Option<Result> {
 }
 
 fn begin_array_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == '[' {
+    if a.chars().next().unwrap() == '[' {
         Some(Result(Token::BeginArray, 1, true))
     } else {
         None
@@ -134,7 +133,7 @@ fn begin_array_tokenizer(a: &str) -> Option<Result> {
 }
 
 fn end_array_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == ']' {
+    if a.chars().next().unwrap() == ']' {
         Some(Result(Token::EndArray, 1, true))
     } else {
         None
@@ -249,7 +248,7 @@ fn is_operator(a: &str) -> bool {
 }
 
 fn match_identifier<'a>(a: &'a str) -> Option<&'a str> {
-    if is_identifier_start(a.char_at(0)) {
+    if is_identifier_start(a.chars().next().unwrap()) {
         let mut consumed = 0;
         for (offset, char) in a.char_indices() {
             if is_identifier_rest(char) {
@@ -290,7 +289,7 @@ fn operator_tokenizer(a: &str) -> Option<Result> {
 }
 
 fn binder_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == '/' && a.len() > 1 {
+    if a.chars().next().unwrap() == '/' && a.len() > 1 {
         match match_identifier(&a[1..]) {
             Some(id) if !is_operator(id) => {
                 Some(Result(Token::Binder(String::from_str(id)), id.len() + 1, true))
@@ -394,7 +393,7 @@ fn integer_tokenizer(a: &str) -> Option<Result> {
 }
 
 fn string_tokenizer(a: &str) -> Option<Result> {
-    if a.char_at(0) == '"' && a.len() > 1 {
+    if a.chars().next().unwrap() == '"' && a.len() > 1 {
         let mut consumed = 0;
         for (offset, char) in a[1..].char_indices() {
             if char == '"' {

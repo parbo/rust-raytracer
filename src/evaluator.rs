@@ -14,7 +14,7 @@ enum Value {
     ValString(String)
 }
 
-type Env = collections::HashMap<String, Value>;
+pub type Env = collections::HashMap<String, Value>;
 
 fn eval_op<'a>(op: &tokenizer::Ops, env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     match op {
@@ -43,7 +43,7 @@ fn eval_op<'a>(op: &tokenizer::Ops, env: Box<Env>, stack: Box<Stack>) -> (Box<En
 
 
 #[derive(PartialEq, Debug, Clone)]
-enum Stack {
+pub enum Stack {
     Cons(Value, Box<Stack>),
     Nil
 }
@@ -148,7 +148,7 @@ fn eval_if(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     if get_boolean(&pred) {
         match c1 {
             Value::ValClosure(e, f) => {
-                let (_, s) = do_evaluate(e, s, f.as_slice());
+                let (_, s) = do_evaluate(e, s, &f);
                 (env, s)
             },
             _ => panic!("can't use non-function {:?} as if function", c1)
@@ -156,7 +156,7 @@ fn eval_if(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     } else {
         match c2 {
             Value::ValClosure(e, f) => {
-                let (_, s) = do_evaluate(e, s, f.as_slice());
+                let (_, s) = do_evaluate(e, s, &f);
                 (env, s)
             },
             _ => panic!("can't use non-function {:?} as if function", c2)
@@ -168,7 +168,7 @@ fn eval_apply(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (c, s) = pop(stack);
     match c {
         Value::ValClosure(e, f) => {
-            let (_, s) = do_evaluate(e, s, f.as_slice());
+            let (_, s) = do_evaluate(e, s, &f);
             (env, s)
         },
         _ => panic!("can't apply non-function {:?}", c)
@@ -493,7 +493,7 @@ fn eval_subf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
 //     return do_surface
 
 fn do_evaluate(mut env: Box<Env>, mut stack: Box<Stack>, ast: &[parser::AstNode]) -> (Box<Env>, Box<Stack>) {
-    for i in range(0, ast.len()) {
+    for i in 0..ast.len() {
         match &ast[i] {
             &parser::AstNode::Function(ref v) => {
                 stack = push(stack, Value::ValClosure(env.clone(), v.clone()));
@@ -519,10 +519,10 @@ fn do_evaluate(mut env: Box<Env>, mut stack: Box<Stack>, ast: &[parser::AstNode]
                     &tokenizer::Token::Binder(ref v) => {
                         let (i, s) = pop(stack);
                         stack = s;
-                        env = add_env(env, v.as_slice(), i);
+                        env = add_env(env, &v, i);
                     },
                     &tokenizer::Token::Identifier(ref v) => {
-                        let val = get_env(&*env, v.as_slice());
+                        let val = get_env(&*env, &v);
                         //                 if isinstance(e, primitives.Node):
                         //                     e = copy.deepcopy(e)
                         stack = push(stack, val.clone())
@@ -557,11 +557,11 @@ fn do_evaluate(mut env: Box<Env>, mut stack: Box<Stack>, ast: &[parser::AstNode]
 fn evaluate(ast: &[parser::AstNode]) -> (Box<Env>, Box<Stack>) {
     // Apparently can't call static methods on aliased types, so her goes the full name of Env
     let env: Box<Env> = Box::new(collections::HashMap::<String, Value>::new());
-    do_evaluate(env, Box::new(Stack::Nil), ast.as_slice())
+    do_evaluate(env, Box::new(Stack::Nil), &ast)
 }
 
 pub fn run(gml: &str) -> (Box<Env>, Box<Stack>) {
-    evaluate(parser::parse(tokenizer::tokenize(gml).as_slice()).as_slice())
+    evaluate(&parser::parse(&tokenizer::tokenize(gml)))
 }
 
 #[test]
@@ -633,8 +633,8 @@ fn test_evaluator() {
     println!("env: {:?}, stack: {:?}", env, stack);
     let  (env, stack) = run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact apply");
     println!("env: {:?}, stack: {:?}", env, stack);
-    for ui in range(0, 10) {
-        for vi in range(0, 10) {
+    for ui in 0..10 {
+        for vi in 0..10 {
             let u = ui as f64;
             let v = vi as f64;
             // Implement a small program

@@ -59,7 +59,7 @@ pub fn parse(a: &[tokenizer::Token]) -> Vec<AstNode> {
 }
 
 #[test]
-#[should_fail]
+#[should_panic]
 fn test_syntax_error() {
     parse(&[tokenizer::Token::BeginFunction]);
     parse(&[tokenizer::Token::BeginArray]);

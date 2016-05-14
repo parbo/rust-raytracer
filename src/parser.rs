@@ -9,7 +9,7 @@ pub enum AstNode {
 
 // This doesn't look like idiomatic rust..
 fn do_parse(tokens: &[tokenizer::Token], offset: usize) -> (usize, Vec<AstNode>) {
-    let mut ast = Vec::<AstNode>::new();
+    let mut ast = Vec::new();
     let mut i = offset;
     while i < tokens.len() {
         match &tokens[i] {

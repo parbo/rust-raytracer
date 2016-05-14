@@ -1,11 +1,9 @@
 use std::collections;
 use parser;
-use std::num::Float;
-use std::ops::Rem;
 use tokenizer;
 
 #[derive(PartialEq, Debug, Clone)]
-enum Value {
+pub enum Value {
     ValClosure(Box<Env>, Vec<parser::AstNode>), // The ast for the function
     ValArray, // TODO
     ValBoolean(bool),
@@ -661,7 +659,7 @@ fn test_evaluator() {
                 c = c / 30.0;
                 let mut ci = c.floor() as i64;
                 ci = modi(ci, 2);
-                if (ci == 1) {
+                if ci == 1 {
                     return 1;
                 } else {
                     return 2;
@@ -669,7 +667,7 @@ fn test_evaluator() {
             }
             // Compare results (which should be the only thing om the top of the stack)
             let expected = test(u / 10.0, v / 10.0);
-            let (env, stack) = run(prog.as_slice());
+            let (_, stack) = run(prog.as_ref());
             match *stack {
                 Stack::Cons(ref val, ref rest) => {
                     assert_eq!(get_integer(&val), expected);

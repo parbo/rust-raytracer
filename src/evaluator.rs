@@ -524,6 +524,7 @@ fn evaluate(ast: &[parser::AstNode]) -> (Env, Stack) {
     // Apparently can't call static methods on aliased types, so her goes the full name of Env
     let mut env: collections::HashMap<String, Value> = collections::HashMap::<String, Value>::new();
     let mut stack = Stack::new();
+    stack.reserve(100); // Let's avoid too many allocations
     do_evaluate(&mut env, &mut stack, &ast);
     (env, stack)
 }

@@ -5,7 +5,7 @@ use tokenizer;
 #[derive(PartialEq, Debug, Clone)]
 pub enum Value {
     ValClosure(Box<Env>, Vec<parser::AstNode>), // The ast for the function
-    ValArray, // TODO
+    ValArray(Vec<Value>),
     ValBoolean(bool),
     ValReal(f64),
     ValInteger(i64),
@@ -19,12 +19,19 @@ fn eval_op<'a>(op: &tokenizer::Ops, env: Box<Env>, stack: Box<Stack>) -> (Box<En
         &tokenizer::Ops::OpAddi => eval_addi(env, stack),
         &tokenizer::Ops::OpAddf => eval_addf(env, stack),
         &tokenizer::Ops::OpApply => eval_apply(env, stack),
+        &tokenizer::Ops::OpAcos => eval_acos(env, stack),
         &tokenizer::Ops::OpAsin => eval_asin(env, stack),
+        &tokenizer::Ops::OpClampf => eval_clampf(env, stack),
+        &tokenizer::Ops::OpCos => eval_cos(env, stack),
         &tokenizer::Ops::OpDivf => eval_divf(env, stack),
+        &tokenizer::Ops::OpDivi => eval_divi(env, stack),
         &tokenizer::Ops::OpEqi => eval_eqi(env, stack),
         &tokenizer::Ops::OpEqf => eval_eqf(env, stack),
         &tokenizer::Ops::OpFloor => eval_floor(env, stack),
+        &tokenizer::Ops::OpFrac => eval_frac(env, stack),
+        &tokenizer::Ops::OpGet => eval_get(env, stack),
         &tokenizer::Ops::OpIf => eval_if(env, stack),
+        &tokenizer::Ops::OpLength => eval_length(env, stack),
         &tokenizer::Ops::OpLessi => eval_lessi(env, stack),
         &tokenizer::Ops::OpLessf => eval_lessf(env, stack),
         &tokenizer::Ops::OpModi => eval_modi(env, stack),
@@ -32,6 +39,8 @@ fn eval_op<'a>(op: &tokenizer::Ops, env: Box<Env>, stack: Box<Stack>) -> (Box<En
         &tokenizer::Ops::OpMulf => eval_mulf(env, stack),
         &tokenizer::Ops::OpNegi => eval_negi(env, stack),
         &tokenizer::Ops::OpNegf => eval_negf(env, stack),
+        &tokenizer::Ops::OpReal => eval_real(env, stack),
+        &tokenizer::Ops::OpSin => eval_sin(env, stack),
         &tokenizer::Ops::OpSqrt => eval_sqrt(env, stack),
         &tokenizer::Ops::OpSubi => eval_subi(env, stack),
         &tokenizer::Ops::OpSubf => eval_subf(env, stack),
@@ -61,9 +70,9 @@ fn get_integer(v: &Value) -> i64 {
     }
 }
 
-fn get_string(v: &Value) -> String {
+fn get_string<'a>(v: &'a Value) -> &'a String {
     match v {
-        &Value::ValString(ref i) => i.clone(),
+        &Value::ValString(ref i) => &i,
         other => panic!("{:?} is not an integer", other)
     }
 }
@@ -82,16 +91,16 @@ fn get_boolean(v: &Value) -> bool {
     }
 }
 
-// def make_array(v):
-//     tmp = []
-//     while v:
-//         e, v = pop(v)
-//         tmp.insert(0, e)
-//     return ('Array', tmp)
-
-// def get_array(a):
-//     assert check_array(a)
-//     return get_value(a)
+fn make_array(s: Box<Stack>) -> Value {
+    let mut tmp = Vec::new();
+    let mut stack = s.clone();
+    while !is_empty(&stack) {
+        let (env, popped_stack) = pop(stack);
+        stack = popped_stack;
+        tmp.insert(0, env);
+    }
+    Value::ValArray(tmp)
+}
 
 // def make_point(x, y, z):
 //     return ('Point', (x,y,z))
@@ -127,6 +136,13 @@ fn pop(stack: Box<Stack>) -> (Value, Box<Stack>) {
             (token.clone(), rest_of_stack.clone())
         },
         Stack::Nil => panic!("stack is empty!")
+    }
+}
+
+fn is_empty(stack: &Stack) -> bool {
+    match *stack {
+        Stack::Cons(_, _) => false,
+        Stack::Nil => true
     }
 }
 
@@ -185,35 +201,35 @@ fn eval_addf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     (env, push(s, Value::ValReal(get_real(&r1) + get_real(&r2))))
 }
 
-// def eval_acos(env, stack):
-//     r, stack = pop(stack)
-//     return env, push(stack, make_real(math.degrees(math.acos(get_real(r)))))
-    
+fn eval_acos(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    (env, push(s, Value::ValReal(get_real(&r).acos().to_degrees())))
+}
+
 fn eval_asin(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r, s) = pop(stack);
     (env, push(s, Value::ValReal(get_real(&r).asin().to_degrees())))
 }
 
-// def eval_clampf(env, stack):
-//     r, stack = pop(stack)
-//     rv = get_real(r)
-//     if rv < 0.0:
-//         rv = 0.0
-//     elif rv > 1.0:
-//         rv = 1.0
-//     return env, push(stack, make_real(rv))
+fn eval_clampf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    (env, push(s, Value::ValReal(get_real(&r).max(0.0).min(1.0))))
+}
 
-// def eval_cos(env, stack):
-//     r, stack = pop(stack)
-//     res = math.cos(math.radians(get_real(r)))
-//     if abs(res) < 1e-15:
-//         res = 0.0
-//     return env, push(stack, make_real(res))
+fn eval_cos(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    let mut res = get_real(&r).to_radians().cos();
+    if res.abs() < 1e-15 {
+        res = 0.0;
+    }
+    (env, push(s, Value::ValReal(res)))
+}
 
-// def eval_divi(env, stack):
-//     i2, stack = pop(stack)
-//     i1, stack = pop(stack)
-//     return env, push(stack, make_integer(divi(get_integer(i1), get_integer(i2))))
+fn eval_divi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (i2, s) = pop(stack);
+    let (i1, s) = pop(s);
+    (env, push(s, Value::ValInteger(get_integer(&i1) / get_integer(&i2))))
+}
 
 fn eval_divf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r2, s) = pop(stack);
@@ -240,9 +256,10 @@ fn eval_floor(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     (env, push(s, Value::ValInteger(get_real(&r).floor() as i64)))
 }
 
-// def eval_frac(env, stack):
-//     r, stack = pop(stack)
-//     return env, push(stack, make_real(math.modf(get_real(r))[0]))
+fn eval_frac(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    (env, push(s, Value::ValReal(get_real(&r).fract())))
+}
 
 fn eval_lessi(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (i2, s) = pop(stack);
@@ -292,16 +309,19 @@ fn eval_negf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     (env, push(s, Value::ValReal(-get_real(&r))))
 }
 
-// def eval_real(env, stack):
-//     i, stack = pop(stack)
-//     return env, push(stack, make_real(float(get_integer(i))))
+fn eval_real(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (i, s) = pop(stack);
+    (env, push(s, Value::ValReal(get_integer(&i) as f64)))
+}
 
-// def eval_sin(env, stack):
-//     r, stack = pop(stack)
-//     res = math.sin(math.radians(get_real(r)))
-//     if abs(res) < 1e-15:
-//         res = 0.0
-//     return env, push(stack, make_real(res))
+fn eval_sin(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (r, s) = pop(stack);
+    let mut res = get_real(&r).to_radians().sin();
+    if res.abs() < 1e-15 {
+        res = 0.0;
+    }
+    (env, push(s, Value::ValReal(res)))
+}
 
 fn eval_sqrt(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
     let (r, s) = pop(stack);
@@ -338,22 +358,28 @@ fn eval_subf(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
 //     p, stack = pop(stack)
 //     return env, push(stack, make_real(get_point_z(p)))
 
-// def eval_get(env, stack):
-//     i, stack = pop(stack)
-//     a, stack = pop(stack)
-//     iv = get_integer(i)
-//     av = get_array(a)
-//     if iv < 0 or iv > len(av):
-//         raise GMLSubscriptError
-//     try:
-//         return env, push(stack, av[iv])
-//     except:
-//         print iv
-//         raise
+fn get_array<'a>(v: &'a Value) -> &'a Vec<Value> {
+    match v {
+        &Value::ValArray(ref a) => a,
+        other => panic!("{:?} is not an array", other)
+    }
+}
 
-// def eval_length(env, stack):
-//     a, stack = pop(stack)
-//     return env, push(stack, make_integer(len(get_array(a))))
+fn eval_get(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (i, s) = pop(stack);
+    let (a, s) = pop(s);
+    let iv = get_integer(&i);
+    let av = get_array(&a);
+    if iv < 0 || iv > av.len() as i64 {
+        panic!("array subscript error: len: {:?}, index: {:?}", av.len(), iv);
+    }
+    (env, push(s, av[iv as usize].clone()))
+}
+
+fn eval_length(env: Box<Env>, stack: Box<Stack>) -> (Box<Env>, Box<Stack>) {
+    let (a, s) = pop(stack);
+    (env, push(s, Value::ValInteger(get_array(&a).len() as i64)))
+}
 
 // def eval_sphere(env, stack):
 //     surface, stack = pop(stack)
@@ -496,9 +522,9 @@ fn do_evaluate(mut env: Box<Env>, mut stack: Box<Stack>, ast: &[parser::AstNode]
             &parser::AstNode::Function(ref v) => {
                 stack = push(stack, Value::ValClosure(env.clone(), v.clone()));
             },
-            &parser::AstNode::Array(_) => {
-//             e, s, a = do_evaluate(env, make_stack(), v)
-//             stack = push(stack, make_array(s))
+            &parser::AstNode::Array(ref v) => {
+                let (_, s) = do_evaluate(env.clone(), Box::new(Stack::Nil), v);
+                stack = push(stack, make_array(s));
             },
             &parser::AstNode::Leaf(ref t) => {
                 match t {
@@ -540,18 +566,6 @@ fn do_evaluate(mut env: Box<Env>, mut stack: Box<Stack>, ast: &[parser::AstNode]
     (env, stack)
 }
 
-// def test(ast, res):    
-//     try:
-//         t = evaluate(ast)    
-//         if t == res:
-//             pass
-//         else:
-//             print ast,"!=",res
-//             print ast,"==",t
-//     except Exception, e:
-//         if type(res) != type or not isinstance(e, res):
-//             raise
-
 fn evaluate(ast: &[parser::AstNode]) -> (Box<Env>, Box<Stack>) {
     // Apparently can't call static methods on aliased types, so her goes the full name of Env
     let env: Box<Env> = Box::new(collections::HashMap::<String, Value>::new());
@@ -570,7 +584,7 @@ fn test_evaluator() {
     let  (env, stack) = run(r#""apa" /x"#);
     println!("env: {:?}, stack: {:?}", env, stack);
     assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
-    assert_eq!(get_string(env.get("x").unwrap()), "apa".to_string());
+    assert_eq!(*get_string(env.get("x").unwrap()), "apa".to_string());
     let  (env, stack) = run("1 2 addi");
     println!("env: {:?}, stack: {:?}", env, stack);
     assert_eq!(stack, Box::new(Stack::Cons(Value::ValInteger(3), Box::new(Stack::Nil))));
@@ -677,4 +691,14 @@ fn test_evaluator() {
             }
         }
     }
+    let  (env, _) = run("-0.4 clampf /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.0));
+    let  (env, _) = run("1.1 clampf /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
+    let  (env, _) = run("0.8 clampf /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.8));
+    let  (env, _) = run("[1 2 3] length /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
+    let  (env, _) = run("[1 2 3] 1 get /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
 }

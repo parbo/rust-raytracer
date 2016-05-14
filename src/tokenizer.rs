@@ -246,7 +246,7 @@ fn is_operator(a: &str) -> bool {
     }
 }
 
-fn match_identifier<'a>(a: &'a str) -> Option<&'a str> {
+fn match_identifier(a: &str) -> Option<&str> {
     if is_identifier_start(a.chars().next().unwrap()) {
         let mut consumed = 0;
         for (offset, char) in a.char_indices() {

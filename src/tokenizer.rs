@@ -52,7 +52,7 @@ pub enum Ops {
     OpSubi,
     OpTranslate,
     OpUnion,
-    OpUscale
+    OpUscale,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -151,27 +151,27 @@ fn boolean_tokenizer(a: &str) -> Option<Result> {
 
 fn is_identifier_start(c: char) -> bool {
     match c {
-        'a' ... 'z' => true,
-        'A' ... 'Z' => true,
-        _ => false
+        'a'...'z' => true,
+        'A'...'Z' => true,
+        _ => false,
     }
 }
 
 fn is_identifier_rest(c: char) -> bool {
     match c {
-        '0' ... '9' => true,
-        'a' ... 'z' => true,
-        'A' ... 'Z' => true,
+        '0'...'9' => true,
+        'a'...'z' => true,
+        'A'...'Z' => true,
         '-' => true,
         '_' => true,
-        _ => false
+        _ => false,
     }
 }
 
 fn is_decimal_number(c: char) -> bool {
     match c {
-        '0' ... '9' => true,
-        _ => false
+        '0'...'9' => true,
+        _ => false,
     }
 }
 
@@ -179,7 +179,7 @@ fn is_exponent(c: char) -> bool {
     match c {
         'e' => true,
         'E' => true,
-        _ => false
+        _ => false,
     }
 }
 
@@ -235,14 +235,14 @@ fn match_operator(a: &str) -> Option<Ops> {
         "translate" => Some(Ops::OpTranslate),
         "union" => Some(Ops::OpUnion),
         "uscale" => Some(Ops::OpUscale),
-        _ => None
+        _ => None,
     }
 }
 
 fn is_operator(a: &str) -> bool {
     match match_operator(a) {
         Some(_) => true,
-        _ => false
+        _ => false,
     }
 }
 
@@ -258,7 +258,7 @@ fn match_identifier(a: &str) -> Option<&str> {
         }
         match consumed {
             0 => None,
-            _ => Some(&a[0..consumed])
+            _ => Some(&a[0..consumed]),
         }
     } else {
         None
@@ -270,7 +270,7 @@ fn identifier_tokenizer(a: &str) -> Option<Result> {
         Some(id) if !is_operator(id) => {
             Some(Result(Token::Identifier(id.to_string()), id.len(), true))
         }
-        _ => None
+        _ => None,
     }
 }
 
@@ -280,10 +280,10 @@ fn operator_tokenizer(a: &str) -> Option<Result> {
         Some(id) => {
             match match_operator(id) {
                 Some(op) => Some(Result(Token::Operator(op), id.len(), true)),
-                _ => None
+                _ => None,
             }
         }
-        _ => None
+        _ => None,
     }
 }
 
@@ -292,8 +292,8 @@ fn binder_tokenizer(a: &str) -> Option<Result> {
         match match_identifier(&a[1..]) {
             Some(id) if !is_operator(id) => {
                 Some(Result(Token::Binder(id.to_string()), id.len() + 1, true))
-            },
-            _ => None  // TODO: maybe raise some error for binding to reserved word
+            }
+            _ => None,  // TODO: maybe raise some error for binding to reserved word
         }
     } else {
         None
@@ -390,7 +390,11 @@ fn integer_tokenizer(a: &str) -> Option<Result> {
     }
     match consumed {
         0 => None,
-        _ => Some(Result(Token::Integer(a[0..(pos + consumed)].parse().unwrap()), pos + consumed, true))
+        _ => {
+            Some(Result(Token::Integer(a[0..(pos + consumed)].parse().unwrap()),
+                        pos + consumed,
+                        true))
+        }
     }
 }
 
@@ -409,7 +413,11 @@ fn string_tokenizer(a: &str) -> Option<Result> {
         }
         match consumed {
             0 => None,
-            _ => Some(Result(Token::Str(String::from_str(&a[1..(consumed + 1)]).unwrap()), consumed + 2, true)),  // Add 2 for the "'s
+            _ => {
+                Some(Result(Token::Str(String::from_str(&a[1..(consumed + 1)]).unwrap()),
+                            consumed + 2,
+                            true))
+            }  // Add 2 for the "'s
         }
     } else {
         None
@@ -417,19 +425,19 @@ fn string_tokenizer(a: &str) -> Option<Result> {
 }
 
 pub fn tokenize(text: &str) -> Vec<Token> {
-    let tokenizers : [fn(&str) -> Option<Result>; 13] = [whitespace_tokenizer,
-                      comment_tokenizer,
-                      begin_function_tokenizer,
-                      end_function_tokenizer,
-                      begin_array_tokenizer,
-                      end_array_tokenizer,
-                      boolean_tokenizer,
-                      identifier_tokenizer,
-                      operator_tokenizer,
-                      binder_tokenizer,
-                      real_tokenizer,
-                      integer_tokenizer,
-                      string_tokenizer];
+    let tokenizers: [fn(&str) -> Option<Result>; 13] = [whitespace_tokenizer,
+                                                        comment_tokenizer,
+                                                        begin_function_tokenizer,
+                                                        end_function_tokenizer,
+                                                        begin_array_tokenizer,
+                                                        end_array_tokenizer,
+                                                        boolean_tokenizer,
+                                                        identifier_tokenizer,
+                                                        operator_tokenizer,
+                                                        binder_tokenizer,
+                                                        real_tokenizer,
+                                                        integer_tokenizer,
+                                                        string_tokenizer];
 
     let mut tokenlist = Vec::<Token>::new();
     let mut pos: usize = 0;
@@ -443,7 +451,7 @@ pub fn tokenize(text: &str) -> Vec<Token> {
                     }
                     pos += consumed;
                     break;
-                },
+                }
                 None => {}
             }
         }
@@ -472,49 +480,54 @@ fn test_comment_tokenizer_comment() {
 fn test_comment_tokenizer_non_comment() {
     let result = comment_tokenizer("blah");
     match result {
-        None => {},
-        Some(_) => assert!(false)
+        None => {}
+        Some(_) => assert!(false),
     }
 }
 
 #[test]
 fn test_tokenizer() {
     assert_eq!(tokenize("1 % apa"), [Token::Integer(1)]);
-    assert_eq!(tokenize("1 % apa\n2"), [Token::Integer(1), Token::Integer(2)]);
+    assert_eq!(tokenize("1 % apa\n2"),
+               [Token::Integer(1), Token::Integer(2)]);
     assert_eq!(tokenize("1"), [Token::Integer(1)]);
     assert_eq!(tokenize("123"), [Token::Integer(123)]);
     assert_eq!(tokenize("-1"), [Token::Integer(-1)]);
     assert_eq!(tokenize("-123"), [Token::Integer(-123)]);
-    assert_eq!(tokenize("1 2"), [Token::Integer( 1), Token::Integer(2)]);
-    assert_eq!(tokenize("123 321"), [Token::Integer(123), Token::Integer(321)]);
+    assert_eq!(tokenize("1 2"), [Token::Integer(1), Token::Integer(2)]);
+    assert_eq!(tokenize("123 321"),
+               [Token::Integer(123), Token::Integer(321)]);
     assert_eq!(tokenize("-1-1"), [Token::Integer(-1), Token::Integer(-1)]);
     assert_eq!(tokenize("1.0"), [Token::Real(1.0)]);
     assert_eq!(tokenize("-1.0"), [Token::Real(-1.0)]);
     assert_eq!(tokenize("1.0e12"), [Token::Real(1.0e12)]);
     assert_eq!(tokenize("1e12"), [Token::Real(1e12)]);
     assert_eq!(tokenize("1e-12"), [Token::Real(1e-12)]);
-    assert_eq!(tokenize("\"test\""), [Token::Str(String::from_str("test").unwrap())]);
+    assert_eq!(tokenize("\"test\""),
+               [Token::Str(String::from_str("test").unwrap())]);
     assert_eq!(tokenize("true"), [Token::Boolean(true)]);
     assert_eq!(tokenize("false"), [Token::Boolean(false)]);
-    assert_eq!(tokenize("/x"), [Token::Binder(String::from_str("x").unwrap())]);
-    assert_eq!(tokenize("/x-y_2"), [Token::Binder(String::from_str("x-y_2").unwrap())]);
-    assert_eq!(tokenize("x"), [Token::Identifier(String::from_str("x").unwrap())]);
-    assert_eq!(tokenize("x-y_2"), [Token::Identifier(String::from_str("x-y_2").unwrap())]);
+    assert_eq!(tokenize("/x"),
+               [Token::Binder(String::from_str("x").unwrap())]);
+    assert_eq!(tokenize("/x-y_2"),
+               [Token::Binder(String::from_str("x-y_2").unwrap())]);
+    assert_eq!(tokenize("x"),
+               [Token::Identifier(String::from_str("x").unwrap())]);
+    assert_eq!(tokenize("x-y_2"),
+               [Token::Identifier(String::from_str("x-y_2").unwrap())]);
     assert_eq!(tokenize("addi"), [Token::Operator(Ops::OpAddi)]);
-    assert_eq!(tokenize("addiblaj"), [Token::Identifier(String::from_str("addiblaj").unwrap())]);
-    assert_eq!(tokenize("[1 2]"), [Token::BeginArray,
-                                    Token::Integer(1),
-                                    Token::Integer(2),
-                                    Token::EndArray]);
-    assert_eq!(tokenize("{1 2}"), [Token::BeginFunction,
-                                    Token::Integer(1),
-                                    Token::Integer(2),
-                                    Token::EndFunction]);
-    assert_eq!(tokenize("{1 [2 3]}"), [Token::BeginFunction,
-                                        Token::Integer(1),
-                                        Token::BeginArray,
-                                        Token::Integer(2),
-                                        Token::Integer(3),
-                                        Token::EndArray,
-                                        Token::EndFunction])
+    assert_eq!(tokenize("addiblaj"),
+               [Token::Identifier(String::from_str("addiblaj").unwrap())]);
+    assert_eq!(tokenize("[1 2]"),
+               [Token::BeginArray, Token::Integer(1), Token::Integer(2), Token::EndArray]);
+    assert_eq!(tokenize("{1 2}"),
+               [Token::BeginFunction, Token::Integer(1), Token::Integer(2), Token::EndFunction]);
+    assert_eq!(tokenize("{1 [2 3]}"),
+               [Token::BeginFunction,
+                Token::Integer(1),
+                Token::BeginArray,
+                Token::Integer(2),
+                Token::Integer(3),
+                Token::EndArray,
+                Token::EndFunction])
 }

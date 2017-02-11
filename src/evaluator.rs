@@ -1,6 +1,7 @@
 use std::collections;
 use parser;
 use tokenizer;
+use vecmath;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Value {
@@ -10,6 +11,7 @@ pub enum Value {
     ValReal(f64),
     ValInteger(i64),
     ValString(String),
+    ValPoint(vecmath::Vec3),
 }
 
 pub type Env = collections::HashMap<String, Value>;
@@ -31,6 +33,9 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
         &tokenizer::Ops::OpFloor => eval_floor(stack),
         &tokenizer::Ops::OpFrac => eval_frac(stack),
         &tokenizer::Ops::OpGet => eval_get(stack),
+        &tokenizer::Ops::OpGetx => eval_getx(stack),
+        &tokenizer::Ops::OpGety => eval_gety(stack),
+        &tokenizer::Ops::OpGetz => eval_getz(stack),
         &tokenizer::Ops::OpIf => eval_if(stack),
         &tokenizer::Ops::OpLength => eval_length(stack),
         &tokenizer::Ops::OpLessi => eval_lessi(stack),
@@ -39,6 +44,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
         &tokenizer::Ops::OpMuli => eval_muli(stack),
         &tokenizer::Ops::OpMulf => eval_mulf(stack),
         &tokenizer::Ops::OpNegi => eval_negi(stack),
+        &tokenizer::Ops::OpPoint => eval_point(stack),
         &tokenizer::Ops::OpNegf => eval_negf(stack),
         &tokenizer::Ops::OpReal => eval_real(stack),
         &tokenizer::Ops::OpSin => eval_sin(stack),
@@ -91,24 +97,24 @@ fn make_array(s: &Stack) -> Value {
     Value::ValArray(tmp)
 }
 
-// def make_point(x, y, z):
-//     return ('Point', (x,y,z))
+fn get_point<'a>(v: &'a Value) -> &'a vecmath::Vec3 {
+    match v {
+        &Value::ValPoint(ref p) => &p,
+        other => panic!("{:?} is not a point", other),
+    }
+}
 
-// def get_point(p):
-//     assert check_point(p)
-//     return get_value(p)
+fn get_point_x(v: &Value) -> f64 {
+    get_point(v)[0]
+}
 
-// def get_point_x(p):
-//     point = get_point(p)
-//     return point[0]
+fn get_point_y(v: &Value) -> f64 {
+    get_point(v)[1]
+}
 
-// def get_point_y(p):
-//     point = get_point(p)
-//     return point[1]
-
-// def get_point_z(p):
-//     point = get_point(p)
-//     return point[2]
+fn get_point_z(v: &Value) -> f64 {
+    get_point(v)[2]
+}
 
 // def get_node(obj):
 //     if not isinstance(obj, primitives.Node):
@@ -297,23 +303,27 @@ fn eval_subf(stack: &mut Stack) {
     stack.push(Value::ValReal(get_real(&r1) - get_real(&r2)));
 }
 
-// def eval_point(env, stack):
-//     z, stack = pop(stack)
-//     y, stack = pop(stack)
-//     x, stack = pop(stack)
-//     return env, push(stack, make_point(get_real(x), get_real(y), get_real(z)))
+fn eval_point(stack: &mut Stack) {
+    let z = stack.pop().unwrap();
+    let y = stack.pop().unwrap();
+    let x = stack.pop().unwrap();
+    stack.push(Value::ValPoint([get_real(&x), get_real(&y), get_real(&z)]));
+}
 
-// def eval_getx(env, stack):
-//     p, stack = pop(stack)
-//     return env, push(stack, make_real(get_point_x(p)))
+fn eval_getx(stack: &mut Stack) {
+    let p = stack.pop().unwrap();
+    stack.push(Value::ValReal(get_point_x(&p)));
+}
 
-// def eval_gety(env, stack):
-//     p, stack = pop(stack)
-//     return env, push(stack, make_real(get_point_y(p)))
+fn eval_gety(stack: &mut Stack) {
+    let p = stack.pop().unwrap();
+    stack.push(Value::ValReal(get_point_y(&p)));
+}
 
-// def eval_getz(env, stack):
-//     p, stack = pop(stack)
-//     return env, push(stack, make_real(get_point_z(p)))
+fn eval_getz(stack: &mut Stack) {
+    let p = stack.pop().unwrap();
+    stack.push(Value::ValReal(get_point_z(&p)));
+}
 
 fn get_array(v: &Value) -> &Vec<Value> {
     match v {
@@ -624,4 +634,12 @@ fn test_evaluator() {
     assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
     let (env, _) = run("[1 2 3] 1 get /x");
     assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
+    let (env, _) = run("1.0 2.0 3.0 point /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValPoint([1.0, 2.0, 3.0]));
+    let (env, _) = run("1.0 2.0 3.0 point getx /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
+    let (env, _) = run("1.0 2.0 3.0 point gety /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValReal(2.0));
+    let (env, _) = run("1.0 2.0 3.0 point getz /x");
+    assert_eq!(env.get("x").unwrap(), &Value::ValReal(3.0));
 }

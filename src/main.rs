@@ -1,5 +1,6 @@
 mod evaluator;
 mod parser;
+mod primitives;
 mod raytracer;
 mod tokenizer;
 mod vecmath;

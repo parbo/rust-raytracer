@@ -1,5 +1,6 @@
 use std::collections;
 use parser;
+use primitives;
 use tokenizer;
 use vecmath;
 

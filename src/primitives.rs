@@ -1,23 +1,18 @@
-// import math
-// from transform import Transform
-// from vecmat import normalize, dot, neg, add, mul, length, sub
-// import copy
+use vecmath::{Vec3};
+use transform::{Transform};
 
-use vecmath;
-
-pub enum Primitive {
-    Cone,
-    Cube,
-    Cylinder,
-    Plane,
-    Sphere,
+pub struct Sphere {
+    transform: Transform
 }
 
-pub enum Node {
-    Operator(Box<Node>, Box<Node>),
-    Primitive,
-}
+// pub enum Node {
+//     Operator(Box<Node>, Box<Node>),
+//     Primitive,
+// }
 
+trait Intersect {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3);
+}
 
 // class Intersection(object):
 //     ENTRY = 0
@@ -203,6 +198,10 @@ pub enum Node {
 //         c += 1.0
 //     return c    
 
+impl Intersect for Sphere {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) {
+    }
+}
 // class Sphere(Primitive):
 //     def intersect(self, raypos, raydir):
 //         tr = self.transform

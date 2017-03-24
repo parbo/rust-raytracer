@@ -4,6 +4,7 @@ mod primitives;
 mod raytracer;
 mod tokenizer;
 mod vecmath;
+mod transform;
 
 #[cfg(not(test))]
 fn main() {

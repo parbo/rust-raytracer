@@ -147,6 +147,13 @@ fn get_point<'a>(v: &'a Value) -> &'a vecmath::Vec3 {
     }
 }
 
+fn move_point(v: Value) -> vecmath::Vec3 {
+    match v {
+        Value::ValPoint(p) => p,
+        other => panic!("{:?} is not a point", other),
+    }
+}
+
 fn get_point_x(v: &Value) -> f64 {
     get_point(v)[0]
 }
@@ -395,7 +402,7 @@ fn eval_length(stack: &mut Stack) {
 
 fn eval_sphere(stack: &mut Stack) {
     let surface = stack.pop().unwrap();
-    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(get_surface(&surface)))));
+    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(move_surface(surface)))));
 }
 
 // def eval_cube(env, stack):
@@ -472,8 +479,8 @@ fn eval_sphere(stack: &mut Stack) {
 fn eval_light(stack: &mut Stack) {
     let color = stack.pop().unwrap();
     let d = stack.pop().unwrap();
-    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(get_point(&d).clone(),
-                                                                      get_point(&color).clone()))));
+    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(move_point(d),
+                                                                      move_point(color)))));
 }
 
 // def eval_pointlight(env, stack):
@@ -513,41 +520,22 @@ fn eval_light(stack: &mut Stack) {
 //                      get_string(file))
 //     return env, stack
 
-// def get_surface(surface):
-//     assert check_closure(surface)
-//     def do_surface(face, u, v):
-//         stack = make_stack()
-//         stack = push(stack, make_integer(face))
-//         stack = push(stack, make_real(u))
-//         stack = push(stack, make_real(v))
-//         e, stack, a = do_evaluate(get_closure_env(surface),
-//                                   stack,
-//                                   get_closure_function(surface))
-//         n, stack = pop(stack)
-//         ks, stack = pop(stack)
-//         kd, stack = pop(stack)
-//         sc, stack = pop(stack)
-//         return get_point(sc), get_real(kd), get_real(ks), get_real(n)
-//     return do_surface
-
-fn get_surface(v: &Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>> {
+// Let's move into here, to avoid one clone
+fn move_surface(v: Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>> {
     match v {
-        &Value::ValClosure(ref env, ref ast) => {
-            // TODO: get rid of the clones
-            let local_env = env.clone();
-            let local_ast = ast.clone();
+        Value::ValClosure(env, ast) => {
             Rc::new(Box::new(move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
-                let mut mutable_local_env = local_env.clone();
+                let mut mutable_local_env = env.clone();
                 let mut stack = Stack::new();
                 stack.push(Value::ValInteger(face));
                 stack.push(Value::ValReal(u));
                 stack.push(Value::ValReal(v));
-                do_evaluate(&mut mutable_local_env, &mut stack, &local_ast);
+                do_evaluate(&mut mutable_local_env, &mut stack, &ast);
                 let n = stack.pop().unwrap();
                 let ks = stack.pop().unwrap();
                 let kd = stack.pop().unwrap();
                 let sc = stack.pop().unwrap();
-                (get_point(&sc).clone(), get_real(&kd), get_real(&ks), get_real(&n))
+                (move_point(sc), get_real(&kd), get_real(&ks), get_real(&n))
             }))
         }
         _ => panic!("not a closure")

@@ -5,6 +5,7 @@ mod raytracer;
 mod tokenizer;
 mod vecmath;
 mod transform;
+mod lights;
 
 #[cfg(not(test))]
 fn main() {

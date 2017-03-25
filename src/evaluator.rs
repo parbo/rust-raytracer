@@ -4,6 +4,7 @@ use parser;
 use primitives;
 use tokenizer;
 use vecmath;
+use lights;
 
 #[derive(Clone)]
 pub enum Value {
@@ -15,12 +16,14 @@ pub enum Value {
     ValString(String),
     ValPoint(vecmath::Vec3),
     ValNode(Box<primitives::Node>),
+    ValLight(Box<lights::Light>),
 }
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Value::ValNode(_) => write!(f, "ValNode"),
+            &Value::ValLight(_) => write!(f, "ValLight"),
             &Value::ValClosure(_, _) => write!(f, "ValClosure"),
             &Value::ValBoolean(x) => write!(f, "ValBoolean {{ {} }}", x),
             &Value::ValReal(x) => write!(f, "ValReal {{ {} }}", x),
@@ -36,6 +39,7 @@ impl PartialEq for Value {
     fn eq(&self, other: &Value) -> bool {
         match (self, other) {
             (&Value::ValNode(_), &Value::ValNode(_)) => false,
+            (&Value::ValLight(_), &Value::ValLight(_)) => false,
             (&Value::ValClosure(ref se, ref sa), &Value::ValClosure(ref oe, ref oa)) => se == oe && sa == oa,
             (&Value::ValBoolean(sv), &Value::ValBoolean(ov)) => sv == ov,
             (&Value::ValReal(sv), &Value::ValReal(ov)) => sv == ov,
@@ -74,6 +78,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
         &tokenizer::Ops::OpLength => eval_length(stack),
         &tokenizer::Ops::OpLessi => eval_lessi(stack),
         &tokenizer::Ops::OpLessf => eval_lessf(stack),
+        &tokenizer::Ops::OpLight => eval_light(stack),
         &tokenizer::Ops::OpModi => eval_modi(stack),
         &tokenizer::Ops::OpMuli => eval_muli(stack),
         &tokenizer::Ops::OpMulf => eval_mulf(stack),
@@ -462,11 +467,11 @@ fn eval_sphere(stack: &mut Stack) {
 //     obj.rotatez(get_real(d))
 //     return env, push(stack, obj)
 
-// def eval_light(env, stack):
-//     color, stack = pop(stack)
-//     d, stack = pop(stack)
-//     return env, push(stack, lights.Light(get_point(d),
-//                                          get_point(color)))
+fn eval_light(stack: &mut Stack) {
+    let color = stack.pop().unwrap();
+    let d = stack.pop().unwrap();
+    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(get_point(&d).clone(), get_point(&color).clone()))));
+}
 
 // def eval_pointlight(env, stack):
 //     color, stack = pop(stack)
@@ -682,6 +687,15 @@ fn test_evaluator() {
     let (env, _) = run("1.0 { /x x } sphere /x");
     match env.get("x").unwrap() {
         &Value::ValNode(ref x) => assert_eq!(x.name(), "sphere"),
+        _ => assert!(false)
+    }
+    let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x");
+    match env.get("x").unwrap() {
+        &Value::ValLight(ref x) => {
+            assert_eq!(x.name(), "light");
+            assert_eq!(x.get_direction([1.0, 1.0, 1.0]), ([-1.0, 0.0, 0.0], None));
+            assert_eq!(x.get_intensity([1.0, 1.0, 1.0]), [0.7, 0.5, 0.3]);
+        },
         _ => assert!(false)
     }
 }

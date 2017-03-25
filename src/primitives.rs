@@ -4,7 +4,8 @@ use transform::{Transform};
 pub struct Intersection {
 }
 
-pub trait Node {
+pub trait Node: NodeClone {
+    fn name(&self) -> &str;
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
     fn inside(&self, pos: Vec3) -> bool;
     fn translate(&mut self, tx: f64, ty: f64, tz: f64);
@@ -15,14 +16,37 @@ pub trait Node {
     fn rotatez(&mut self, d: f64);
 }
 
+trait NodeClone {
+    fn clone_box(&self) -> Box<Node>;
+}
+
+impl<T> NodeClone for T where T: 'static + Node + Clone {
+    fn clone_box(&self) -> Box<Node> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<Node> {
+    fn clone(&self) -> Box<Node> {
+        self.clone_box()
+    }
+}
+
 pub struct Operator {
     obj1: Box<Node>,
     obj2: Box<Node>,
     rule: Fn(bool, bool) -> bool
 }
 
+#[derive(Clone, Default)]
 pub struct Sphere {
     transform: Transform
+}
+
+impl Sphere {
+    pub fn new() -> Sphere {
+        Sphere { transform: Default::default() }
+    }
 }
 
 // class Intersection(object):
@@ -210,6 +234,9 @@ pub struct Sphere {
 //     return c    
 
 impl Node for Sphere {
+    fn name(&self) -> &str {
+        return "sphere";
+    }
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
         vec!()
     }

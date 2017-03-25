@@ -1,10 +1,11 @@
 use std::collections;
+use std::fmt;
 use parser;
 use primitives;
 use tokenizer;
 use vecmath;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     ValClosure(Env, Vec<parser::AstNode>), // The ast for the function
     ValArray(Vec<Value>),
@@ -13,6 +14,38 @@ pub enum Value {
     ValInteger(i64),
     ValString(String),
     ValPoint(vecmath::Vec3),
+    ValNode(Box<primitives::Node>),
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Value::ValNode(_) => write!(f, "ValNode"),
+            &Value::ValClosure(_, _) => write!(f, "ValClosure"),
+            &Value::ValBoolean(x) => write!(f, "ValBoolean {{ {} }}", x),
+            &Value::ValReal(x) => write!(f, "ValReal {{ {} }}", x),
+            &Value::ValInteger(x) => write!(f, "ValInteger {{ {} }}", x),
+            &Value::ValString(ref x) => write!(f, "ValString {{ {} }}", x),
+            &Value::ValArray(ref x) => write!(f, "ValArray {{ {:?} }}", x),
+            &Value::ValPoint(ref x) => write!(f, "ValPoint {{ {:?} }}", x),
+        }
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (&Value::ValNode(_), &Value::ValNode(_)) => false,
+            (&Value::ValClosure(ref se, ref sa), &Value::ValClosure(ref oe, ref oa)) => se == oe && sa == oa,
+            (&Value::ValBoolean(sv), &Value::ValBoolean(ov)) => sv == ov,
+            (&Value::ValReal(sv), &Value::ValReal(ov)) => sv == ov,
+            (&Value::ValInteger(sv), &Value::ValInteger(ov)) => sv == ov,
+            (&Value::ValString(ref sv), &Value::ValString(ref ov)) => sv == ov,
+            (&Value::ValArray(ref sv), &Value::ValArray(ref ov)) => sv == ov,
+            (&Value::ValPoint(ref sv), &Value::ValPoint(ref ov)) => sv == ov,
+            _ => false
+        }
+    }
 }
 
 pub type Env = collections::HashMap<String, Value>;
@@ -49,6 +82,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
         &tokenizer::Ops::OpNegf => eval_negf(stack),
         &tokenizer::Ops::OpReal => eval_real(stack),
         &tokenizer::Ops::OpSin => eval_sin(stack),
+        &tokenizer::Ops::OpSphere => eval_sphere(stack),
         &tokenizer::Ops::OpSqrt => eval_sqrt(stack),
         &tokenizer::Ops::OpSubi => eval_subi(stack),
         &tokenizer::Ops::OpSubf => eval_subf(stack),
@@ -351,9 +385,11 @@ fn eval_length(stack: &mut Stack) {
     stack.push(Value::ValInteger(get_array(&a).len() as i64));
 }
 
-// def eval_sphere(env, stack):
-//     surface, stack = pop(stack)
-//     return env, push(stack, primitives.Sphere(get_surface(surface)))
+fn eval_sphere(stack: &mut Stack) {
+    let surface = stack.pop().unwrap();
+    // TODO: pass in the surface
+    stack.push(Value::ValNode(Box::new(primitives::Sphere::new())));
+}
 
 // def eval_cube(env, stack):
 //     surface, stack = pop(stack)
@@ -643,4 +679,9 @@ fn test_evaluator() {
     assert_eq!(env.get("x").unwrap(), &Value::ValReal(2.0));
     let (env, _) = run("1.0 2.0 3.0 point getz /x");
     assert_eq!(env.get("x").unwrap(), &Value::ValReal(3.0));
+    let (env, _) = run("1.0 { /x x } sphere /x");
+    match env.get("x").unwrap() {
+        &Value::ValNode(ref x) => assert_eq!(x.name(), "sphere"),
+        _ => assert!(false)
+    }
 }

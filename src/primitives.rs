@@ -1,17 +1,28 @@
 use vecmath::{Vec3};
 use transform::{Transform};
 
-pub struct Sphere {
-    transform: Transform
+pub struct Intersection {
 }
 
-// pub enum Node {
-//     Operator(Box<Node>, Box<Node>),
-//     Primitive,
-// }
+pub trait Node {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
+    fn inside(&self, pos: Vec3) -> bool;
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64);
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64);
+    fn uscale(&mut self, s: f64);
+    fn rotatex(&mut self, d: f64);
+    fn rotatey(&mut self, d: f64);
+    fn rotatez(&mut self, d: f64);
+}
 
-trait Intersect {
-    fn intersect(&self, raypos: Vec3, raydir: Vec3);
+pub struct Operator {
+    obj1: Box<Node>,
+    obj2: Box<Node>,
+    rule: Fn(bool, bool) -> bool
+}
+
+pub struct Sphere {
+    transform: Transform
 }
 
 // class Intersection(object):
@@ -198,8 +209,24 @@ trait Intersect {
 //         c += 1.0
 //     return c    
 
-impl Intersect for Sphere {
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) {
+impl Node for Sphere {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+        vec!()
+    }
+    fn inside(&self, pos: Vec3) -> bool {
+        false
+    }
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+    }
+    fn uscale(&mut self, s: f64) {
+    }
+    fn rotatex(&mut self, d: f64) {
+    }
+    fn rotatey(&mut self, d: f64) {
+    }
+    fn rotatez(&mut self, d: f64) {
     }
 }
 // class Sphere(Primitive):

@@ -1,5 +1,6 @@
 use std::collections;
 use std::fmt;
+use std::rc::Rc;
 use parser;
 use primitives;
 use tokenizer;
@@ -394,8 +395,7 @@ fn eval_length(stack: &mut Stack) {
 
 fn eval_sphere(stack: &mut Stack) {
     let surface = stack.pop().unwrap();
-    // TODO: pass in the surface
-    stack.push(Value::ValNode(Box::new(primitives::Sphere::new())));
+    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(get_surface(&surface)))));
 }
 
 // def eval_cube(env, stack):
@@ -529,6 +529,30 @@ fn eval_light(stack: &mut Stack) {
 //         sc, stack = pop(stack)
 //         return get_point(sc), get_real(kd), get_real(ks), get_real(n)
 //     return do_surface
+
+fn get_surface(v: &Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>> {
+    match v {
+        &Value::ValClosure(ref env, ref ast) => {
+            // TODO: get rid of the clones
+            let local_env = env.clone();
+            let local_ast = ast.clone();
+            Rc::new(Box::new(move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
+                let mut mutable_local_env = local_env.clone();
+                let mut stack = Stack::new();
+                stack.push(Value::ValInteger(face));
+                stack.push(Value::ValReal(u));
+                stack.push(Value::ValReal(v));
+                do_evaluate(&mut mutable_local_env, &mut stack, &local_ast);
+                let n = stack.pop().unwrap();
+                let ks = stack.pop().unwrap();
+                let kd = stack.pop().unwrap();
+                let sc = stack.pop().unwrap();
+                (get_point(&sc).clone(), get_real(&kd), get_real(&ks), get_real(&n))
+            }))
+        }
+        _ => panic!("not a closure")
+    }
+}
 
 fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
     for i in 0..ast.len() {

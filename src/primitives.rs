@@ -1,5 +1,6 @@
 use vecmath::Vec3;
 use transform::Transform;
+use std::rc::Rc;
 
 pub struct Intersection {
 }
@@ -40,14 +41,15 @@ pub struct Operator {
     rule: Fn(bool, bool) -> bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Sphere {
     transform: Transform,
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>
 }
 
 impl Sphere {
-    pub fn new() -> Sphere {
-        Sphere { transform: Default::default() }
+    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
+        Sphere { transform: Default::default(), surface: surface }
     }
 }
 

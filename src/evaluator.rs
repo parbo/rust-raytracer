@@ -748,4 +748,5 @@ fn test_evaluator() {
         }
         _ => assert!(false),
     }
+    let (env, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /x x } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#);
 }

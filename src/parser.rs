@@ -4,7 +4,7 @@ use tokenizer;
 pub enum AstNode {
     Leaf(tokenizer::Token),
     Array(Vec<AstNode>),
-    Function(Vec<AstNode>)
+    Function(Vec<AstNode>),
 }
 
 // This doesn't look like idiomatic rust..
@@ -15,30 +15,30 @@ fn do_parse(tokens: &[tokenizer::Token], offset: usize) -> (usize, Vec<AstNode>)
         match &tokens[i] {
             &tokenizer::Token::EndFunction => {
                 return (i + 1, ast);
-            },
+            }
             &tokenizer::Token::EndArray => {
                 return (i + 1, ast);
-            },
+            }
             &tokenizer::Token::BeginFunction => {
                 let (new_i, tmp) = do_parse(tokens, i + 1);
                 i = new_i;
                 // Check that there was a matching end
-                match &tokens[i-1] {
-                    &tokenizer::Token::EndFunction => {},
-                    _ => panic!("syntax error")
+                match &tokens[i - 1] {
+                    &tokenizer::Token::EndFunction => {}
+                    _ => panic!("syntax error"),
                 }
                 ast.push(AstNode::Function(tmp));
-            },
+            }
             &tokenizer::Token::BeginArray => {
                 let (new_i, tmp) = do_parse(tokens, i + 1);
                 i = new_i;
                 // Check that there was a matching end
-                match &tokens[i-1] {
-                    &tokenizer::Token::EndArray => {},
-                    _ => panic!("syntax error")
+                match &tokens[i - 1] {
+                    &tokenizer::Token::EndArray => {}
+                    _ => panic!("syntax error"),
                 }
                 ast.push(AstNode::Array(tmp));
-            },
+            }
             token => {
                 i += 1;
                 // This doesn't really seem right

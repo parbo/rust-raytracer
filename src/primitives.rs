@@ -1,5 +1,5 @@
-use vecmath::{Vec3};
-use transform::{Transform};
+use vecmath::Vec3;
+use transform::Transform;
 
 pub struct Intersection {
 }
@@ -20,7 +20,9 @@ trait NodeClone {
     fn clone_box(&self) -> Box<Node>;
 }
 
-impl<T> NodeClone for T where T: 'static + Node + Clone {
+impl<T> NodeClone for T
+    where T: 'static + Node + Clone
+{
     fn clone_box(&self) -> Box<Node> {
         Box::new(self.clone())
     }
@@ -35,12 +37,12 @@ impl Clone for Box<Node> {
 pub struct Operator {
     obj1: Box<Node>,
     obj2: Box<Node>,
-    rule: Fn(bool, bool) -> bool
+    rule: Fn(bool, bool) -> bool,
 }
 
 #[derive(Clone, Default)]
 pub struct Sphere {
-    transform: Transform
+    transform: Transform,
 }
 
 impl Sphere {
@@ -168,7 +170,7 @@ impl Sphere {
 
 //             newinside = self.rule(inside1 > 0, inside2 > 0)
 // #            print i, inside1, inside2, inside, newinside
-//             if inside and not newinside:                
+//             if inside and not newinside:
 //                 if (i.distance - prevt) < 1e-10:
 //                     # remove infinitesimal intersections
 //                     # to avoid problem with difference of touching surfaces
@@ -190,11 +192,11 @@ impl Sphere {
 // class Union(Operator):
 //     def rule(self, a, b):
 //         return a or b
-    
+
 // class Intersect(Operator):
 //     def rule(self, a, b):
 //         return a and b
-    
+
 // class Difference(Operator):
 //     def rule(self, a, b):
 //         return a and not b
@@ -231,30 +233,24 @@ impl Sphere {
 //     c = 0.5 * math.atan2(a, b) / math.pi
 //     while c < 0.0:
 //         c += 1.0
-//     return c    
+//     return c
 
 impl Node for Sphere {
     fn name(&self) -> &str {
         return "sphere";
     }
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
-        vec!()
+        vec![]
     }
     fn inside(&self, pos: Vec3) -> bool {
         false
     }
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-    }
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-    }
-    fn uscale(&mut self, s: f64) {
-    }
-    fn rotatex(&mut self, d: f64) {
-    }
-    fn rotatey(&mut self, d: f64) {
-    }
-    fn rotatez(&mut self, d: f64) {
-    }
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {}
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {}
+    fn uscale(&mut self, s: f64) {}
+    fn rotatex(&mut self, d: f64) {}
+    fn rotatey(&mut self, d: f64) {}
+    fn rotatez(&mut self, d: f64) {}
 }
 // class Sphere(Primitive):
 //     def intersect(self, raypos, raydir):
@@ -269,7 +265,7 @@ impl Node for Sphere {
 //             return []
 //         msq = lsq - s * s
 //         if msq > 1.0:
-//             return []  
+//             return []
 //         q = math.sqrt(1.0 - msq)
 //         t1 = s + q
 //         t2 = s - q
@@ -284,7 +280,7 @@ impl Node for Sphere {
 
 //     def inside(self, pos):
 //         x, y, z = self.transform.inv_transform_point(pos)
-//         return (x * x + y * y + z * z) <= 1.0        
+//         return (x * x + y * y + z * z) <= 1.0
 
 //     def get_surface(self, i):
 //         x, y, z = i.opos
@@ -305,7 +301,7 @@ impl Node for Sphere {
 //     slabs = [(3, 2),
 //              (4, 5),
 //              (1, 0)]
-    
+
 //     def intersect(self, raypos, raydir):
 //         tr = self.transform
 //         raydir = tr.inv_transform_vector(raydir)
@@ -342,9 +338,9 @@ impl Node for Sphere {
 //         if tmax[0] > 0.0:
 //             ts.append(Intersection(scale, tmax[0], raypos, raydir, self, Intersection.EXIT, tmax[1]))
 //         return ts
-        
+
 //     def inside(self, pos):
-//         x, y, z = self.transform.inv_transform_point(pos)        
+//         x, y, z = self.transform.inv_transform_point(pos)
 //         return 0.0 <= x <= 1.0 and 0.0 <= y <= 1.0 and 0.0 <= z <= 1.0
 
 //     def get_surface(self, i):
@@ -365,7 +361,7 @@ impl Node for Sphere {
 //         else:
 //             print opos
 //             assert False
-            
+
 //     def get_normal(self, i):
 //         return normalize(self.transform.transform_normal(self.normals[i.face]))
 
@@ -423,7 +419,7 @@ impl Node for Sphere {
 //             # ray is orthogonal to the cylinder axis
 //             # check planes
 //             if py < 0.0 or py > 1.0:
-//                 return []            
+//                 return []
 //             # check cylinder
 //             res = self._solveCyl(px, pz, dx, dz)
 //             if not res:
@@ -486,7 +482,7 @@ impl Node for Sphere {
 //         elif i.face == 2:
 //             n =(0.0, -1.0, 0.0)
 //         return normalize(self.transform.transform_normal(n))
-    
+
 
 // class Cone(Primitive):
 //     def _solveCone(self, px, py, pz, dx, dy, dz):
@@ -550,7 +546,7 @@ impl Node for Sphere {
 //         if ts[1][0] > 0.0:
 //             tr.append(Intersection(scale, ts[1][0], raypos, raydir, self, Intersection.EXIT, ts[1][1]))
 //         return tr
-       
+
 //     def inside(self, pos):
 //         x, y, z = self.transform.inv_transform_point(pos)
 //         return (x * x - y * y + z * z) <= 0.0 and 0.0 <= y <= 1.0
@@ -570,7 +566,7 @@ impl Node for Sphere {
 //         elif i.face == 1:
 //             n = (0.0, 1.0, 0.0)
 //         return normalize(self.transform.transform_normal(n))
-    
+
 
 // class Plane(Primitive):
 //     np = (0.0, 1.0, 0.0)
@@ -591,7 +587,7 @@ impl Node for Sphere {
 //             return [Intersection(scale, t, raypos, raydir, self, Intersection.EXIT, 0)]
 //         else:
 //             return [Intersection(scale, t, raypos, raydir, self, Intersection.ENTRY, 0)]
-            
+
 //     def inside(self, pos):
 //         return self.transform.inv_transform_py(pos) <= 0.0
 

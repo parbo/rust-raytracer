@@ -40,14 +40,16 @@ impl PartialEq for Value {
         match (self, other) {
             (&Value::ValNode(_), &Value::ValNode(_)) => false,
             (&Value::ValLight(_), &Value::ValLight(_)) => false,
-            (&Value::ValClosure(ref se, ref sa), &Value::ValClosure(ref oe, ref oa)) => se == oe && sa == oa,
+            (&Value::ValClosure(ref se, ref sa), &Value::ValClosure(ref oe, ref oa)) => {
+                se == oe && sa == oa
+            }
             (&Value::ValBoolean(sv), &Value::ValBoolean(ov)) => sv == ov,
             (&Value::ValReal(sv), &Value::ValReal(ov)) => sv == ov,
             (&Value::ValInteger(sv), &Value::ValInteger(ov)) => sv == ov,
             (&Value::ValString(ref sv), &Value::ValString(ref ov)) => sv == ov,
             (&Value::ValArray(ref sv), &Value::ValArray(ref ov)) => sv == ov,
             (&Value::ValPoint(ref sv), &Value::ValPoint(ref ov)) => sv == ov,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -470,7 +472,8 @@ fn eval_sphere(stack: &mut Stack) {
 fn eval_light(stack: &mut Stack) {
     let color = stack.pop().unwrap();
     let d = stack.pop().unwrap();
-    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(get_point(&d).clone(), get_point(&color).clone()))));
+    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(get_point(&d).clone(),
+                                                                      get_point(&color).clone()))));
 }
 
 // def eval_pointlight(env, stack):
@@ -687,7 +690,7 @@ fn test_evaluator() {
     let (env, _) = run("1.0 { /x x } sphere /x");
     match env.get("x").unwrap() {
         &Value::ValNode(ref x) => assert_eq!(x.name(), "sphere"),
-        _ => assert!(false)
+        _ => assert!(false),
     }
     let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x");
     match env.get("x").unwrap() {
@@ -695,7 +698,7 @@ fn test_evaluator() {
             assert_eq!(x.name(), "light");
             assert_eq!(x.get_direction([1.0, 1.0, 1.0]), ([-1.0, 0.0, 0.0], None));
             assert_eq!(x.get_intensity([1.0, 1.0, 1.0]), [0.7, 0.5, 0.3]);
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     }
 }

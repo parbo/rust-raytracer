@@ -10,7 +10,9 @@ trait LightClone {
     fn clone_box(&self) -> Box<Light>;
 }
 
-impl<T> LightClone for T where T: 'static + Light + Clone {
+impl<T> LightClone for T
+    where T: 'static + Light + Clone
+{
     fn clone_box(&self) -> Box<Light> {
         Box::new(self.clone())
     }
@@ -25,12 +27,15 @@ impl Clone for Box<Light> {
 #[derive(Clone)]
 pub struct DirectionalLight {
     direction: Vec3,
-    color: Vec3
+    color: Vec3,
 }
 
 impl DirectionalLight {
     pub fn new(d: Vec3, c: Vec3) -> DirectionalLight {
-        DirectionalLight { direction: normalize(neg(d)), color: c }
+        DirectionalLight {
+            direction: normalize(neg(d)),
+            color: c,
+        }
     }
 }
 
@@ -64,7 +69,7 @@ impl Light for DirectionalLight {
 //     def __init__(self, p, c):
 //         self.pos = p
 //         self.color = c
-        
+
 //     def get_direction(self, pos):
 //         d = sub(self.pos, pos)
 //         dl = length(d)
@@ -84,7 +89,7 @@ impl Light for DirectionalLight {
 //         self.cutoff = cutoff
 //         self.coscutoff = math.cos(math.radians(self.cutoff))
 //         self.exp = exp
-    
+
 //     def get_direction(self, pos):
 //         d = sub(self.pos, pos)
 //         dl = length(d)
@@ -99,5 +104,3 @@ impl Light for DirectionalLight {
 //             return (0.0, 0.0, 0.0)
 //         i = pow(dot(self.d, mul(d, -invlend)), self.exp)
 //         return mul(self.color, i * 100.0 / (99.0 + dsq))
-
-

@@ -2,10 +2,13 @@ use vecmath::{normalize, add, sub, neg, mul, dot, length, cross, Vec3};
 use std::path::Path;
 use std::io::{Write, Result};
 use std::fs::File;
+use std::rc::Rc;
+use primitives::{Node, Sphere};
+use lights::{Light, DirectionalLight};
 
 type Pixel = [f64; 3];
 
-fn write_ppm_file(pixels: &[Pixel], w: u32, h: u32, filename: &str) -> Result<()> {
+fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()> {
     let path = Path::new(filename);
     let mut file = try!(File::create(&path));
     let header = format!("P6 {} {} 255\n", w, h);
@@ -19,20 +22,24 @@ fn write_ppm_file(pixels: &[Pixel], w: u32, h: u32, filename: &str) -> Result<()
     Ok(())
 }
 
-fn trace(// amb, lights, obj,
-         depth: u32,
+fn trace(amb: Vec3,
+         lights: &[Box<Light>],
+         scene: &Node,
+         depth: i64,
          raypos: Vec3,
          raydir: Vec3)
          -> Pixel {
     [1.0, 0.0, 0.0]
 }
 
-fn render(// amb, lights, obj,
-          depth: u32,
-          fov: f64,
-          w: u32,
-          h: u32,
-          filename: &str) {
+pub fn render(amb: Vec3,
+              lights: Vec<Box<Light>>,
+              scene: Box<Node>,
+              depth: i64,
+              fov: f64,
+              w: i64,
+              h: i64,
+              filename: &str) {
     let mut pixels = Vec::new();
     let raypos = [0.0, 0.0, -1.0];
     let w_world = 2.0 * (0.5 * fov.to_radians()).tan();
@@ -46,7 +53,9 @@ fn render(// amb, lights, obj,
             let x = ix as f64;
             let dir = [c_x + (x + 0.5) * pw, c_y - (y + 0.5) * pw, -raypos[2]];
             let raydir = normalize(dir);
-            let p = trace(// amb, lights, obj,
+            let p = trace(amb,
+                          &lights,
+                          &*scene,
                           depth,
                           raypos,
                           raydir);
@@ -74,5 +83,8 @@ fn test_ppm() {
 
 #[test]
 fn test_raytrace() {
-    render(3, 90.0, 256, 256, "raytrace.ppm");
+    let mut lights : Vec<Box<Light>> = Vec::new();
+    lights.push(Box::new(DirectionalLight::new([1.0, 0.0, 0.0], [0.3, 0.4, 0.5])));
+    let obj = Box::new(Sphere::new(Rc::new(Box::new(|face, u, v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
+    render([0.7, 0.8, 0.3], lights, obj, 3, 90.0, 256, 256, "raytrace.ppm");
 }

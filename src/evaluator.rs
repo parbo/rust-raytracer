@@ -6,6 +6,7 @@ use primitives;
 use tokenizer;
 use vecmath;
 use lights;
+use raytracer;
 
 #[derive(Clone)]
 pub enum Value {
@@ -89,6 +90,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
         &tokenizer::Ops::OpPoint => eval_point(stack),
         &tokenizer::Ops::OpNegf => eval_negf(stack),
         &tokenizer::Ops::OpReal => eval_real(stack),
+        &tokenizer::Ops::OpRender => eval_render(stack),
         &tokenizer::Ops::OpSin => eval_sin(stack),
         &tokenizer::Ops::OpSphere => eval_sphere(stack),
         &tokenizer::Ops::OpSqrt => eval_sqrt(stack),
@@ -166,10 +168,12 @@ fn get_point_z(v: &Value) -> f64 {
     get_point(v)[2]
 }
 
-// def get_node(obj):
-//     if not isinstance(obj, primitives.Node):
-//         raise GMLTypeError
-//     return obj
+fn move_node(v: Value) -> Box<primitives::Node> {
+    match v {
+        Value::ValNode(n) => n,
+        _ => panic!("not a node!")
+    }
+}
 
 fn eval_if(stack: &mut Stack) {
     let c2 = stack.pop().unwrap();
@@ -382,6 +386,18 @@ fn get_array(v: &Value) -> &Vec<Value> {
     }
 }
 
+fn move_lights(v: Value) -> Vec<Box<lights::Light>> {
+    match v {
+        Value::ValArray(a) => {
+            a.into_iter().map(|v| match v {
+                Value::ValLight(light) => light,
+                _ => panic!("array must be lights only!")
+            }).collect()
+        }
+        other => panic!("{:?} is not an array", other),
+    }
+}
+
 fn eval_get(stack: &mut Stack) {
     let i = stack.pop().unwrap();
     let a = stack.pop().unwrap();
@@ -519,6 +535,25 @@ fn eval_light(stack: &mut Stack) {
 //                      get_integer(ht),
 //                      get_string(file))
 //     return env, stack
+
+fn eval_render(stack: &mut Stack) {
+    let file = stack.pop().unwrap();
+    let ht = stack.pop().unwrap();
+    let wid = stack.pop().unwrap();
+    let fov = stack.pop().unwrap();
+    let depth = stack.pop().unwrap();
+    let obj = stack.pop().unwrap();
+    let lights = stack.pop().unwrap();
+    let amb = stack.pop().unwrap();
+    raytracer::render(move_point(amb),
+                      move_lights(lights),
+                      move_node(obj),
+                      get_integer(&depth),
+                      get_real(&fov),
+                      get_integer(&wid),
+                      get_integer(&ht),
+                      get_string(&file));
+}
 
 // Let's move into here, to avoid one clone
 fn move_surface(v: Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>> {

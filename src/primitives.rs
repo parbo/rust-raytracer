@@ -17,7 +17,7 @@ pub trait Node: NodeClone {
     fn rotatez(&mut self, d: f64);
 }
 
-trait NodeClone {
+pub trait NodeClone {
     fn clone_box(&self) -> Box<Node>;
 }
 
@@ -35,11 +35,11 @@ impl Clone for Box<Node> {
     }
 }
 
-pub struct Operator {
-    obj1: Box<Node>,
-    obj2: Box<Node>,
-    rule: Fn(bool, bool) -> bool,
-}
+// pub struct Operator {
+//     obj1: Box<Node>,
+//     obj2: Box<Node>,
+//     rule: Fn(bool, bool) -> bool,
+// }
 
 #[derive(Clone)]
 pub struct Sphere {
@@ -241,18 +241,18 @@ impl Node for Sphere {
     fn name(&self) -> &str {
         return "sphere";
     }
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, _raypos: Vec3, _raydir: Vec3) -> Vec<Intersection> {
         vec![]
     }
-    fn inside(&self, pos: Vec3) -> bool {
+    fn inside(&self, _pos: Vec3) -> bool {
         false
     }
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {}
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {}
-    fn uscale(&mut self, s: f64) {}
-    fn rotatex(&mut self, d: f64) {}
-    fn rotatey(&mut self, d: f64) {}
-    fn rotatez(&mut self, d: f64) {}
+    fn translate(&mut self, _tx: f64, _ty: f64, _tz: f64) {}
+    fn scale(&mut self, _sx: f64, _sy: f64, _sz: f64) {}
+    fn uscale(&mut self, _s: f64) {}
+    fn rotatex(&mut self, _d: f64) {}
+    fn rotatey(&mut self, _d: f64) {}
+    fn rotatez(&mut self, _d: f64) {}
 }
 // class Sphere(Primitive):
 //     def intersect(self, raypos, raydir):

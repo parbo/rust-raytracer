@@ -1,4 +1,4 @@
-use vecmath::{normalize, add, sub, neg, mul, dot, length, cross, Vec3};
+use vecmath::{normalize, Vec3};
 use std::path::Path;
 use std::io::{Write, Result};
 use std::fs::File;
@@ -22,12 +22,12 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()
     Ok(())
 }
 
-fn trace(amb: Vec3,
-         lights: &[Box<Light>],
-         scene: &Node,
-         depth: i64,
-         raypos: Vec3,
-         raydir: Vec3)
+fn trace(_amb: Vec3,
+         _lights: &[Box<Light>],
+         _scene: &Node,
+         _depth: i64,
+         _raypos: Vec3,
+         _raydir: Vec3)
          -> Pixel {
     [1.0, 0.0, 0.0]
 }
@@ -62,7 +62,7 @@ pub fn render(amb: Vec3,
             pixels.push(p);
         }
     }
-    write_ppm_file(&pixels, w, h, filename);
+    write_ppm_file(&pixels, w, h, filename).expect("failed to write file");
 }
 
 #[test]
@@ -78,13 +78,13 @@ fn test_ppm() {
             pixels.push([x as f64 / 255.0, y as f64 / 255.0, (x + y) as f64 / (2.0 * 255.0)]);
         }
     }
-    write_ppm_file(&pixels, 256, 256, "test.ppm");
+    write_ppm_file(&pixels, 256, 256, "test.ppm").expect("failed to write file");
 }
 
 #[test]
 fn test_raytrace() {
     let mut lights : Vec<Box<Light>> = Vec::new();
     lights.push(Box::new(DirectionalLight::new([1.0, 0.0, 0.0], [0.3, 0.4, 0.5])));
-    let obj = Box::new(Sphere::new(Rc::new(Box::new(|face, u, v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
+    let obj = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
     render([0.7, 0.8, 0.3], lights, obj, 3, 90.0, 256, 256, "raytrace.ppm");
 }

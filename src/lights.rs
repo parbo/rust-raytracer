@@ -6,7 +6,7 @@ pub trait Light: LightClone {
     fn get_intensity(&self, pos: Vec3) -> Vec3;
 }
 
-trait LightClone {
+pub trait LightClone {
     fn clone_box(&self) -> Box<Light>;
 }
 
@@ -43,10 +43,10 @@ impl Light for DirectionalLight {
     fn name(&self) -> &str {
         "light"
     }
-    fn get_direction(&self, pos: Vec3) -> (Vec3, Option<f64>) {
+    fn get_direction(&self, _pos: Vec3) -> (Vec3, Option<f64>) {
         (self.direction, None)
     }
-    fn get_intensity(&self, pos: Vec3) -> Vec3 {
+    fn get_intensity(&self, _pos: Vec3) -> Vec3 {
         self.color
     }
 }

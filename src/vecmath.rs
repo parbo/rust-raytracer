@@ -14,6 +14,6 @@ pub use self::vecmath_lib::vec3_sub as sub;
 pub use self::vecmath_lib::mat4_id as identity;
 pub use self::vecmath_lib::col_mat4_mul as mmmul;
 
-pub fn length(v: Vec3) -> f64 {
-    square_length(v).sqrt()
-}
+// pub fn length(v: Vec3) -> f64 {
+//     square_length(v).sqrt()
+// }

@@ -1,4 +1,5 @@
 use std::collections;
+use std::error::Error as StdError;
 use std::fmt;
 use std::rc::Rc;
 use parser;
@@ -59,7 +60,36 @@ impl PartialEq for Value {
 pub type Env = collections::HashMap<String, Value>;
 pub type Stack = Vec<Value>;
 
-fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
+fn pop(stack: &mut Stack) -> Result<Value, EvalError> {
+    return stack.pop().ok_or(EvalError::EmptyStack);
+}
+
+#[derive(Debug)]
+enum EvalError {
+    EmptyStack,
+    WrongType(Value),
+    OpNotImplemented(tokenizer::Ops),
+    ArrayOutOfBounds(i64, usize),
+}
+
+impl fmt::Display for EvalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        return f.write_str(self.description());
+    }
+}
+
+impl StdError for EvalError {
+    fn description(&self) -> &str {
+        match *self {
+            EvalError::EmptyStack => "EmptyStack",
+            EvalError::WrongType(_) => "Wrongtype",
+            EvalError::OpNotImplemented(_) => "OpNotImplemented",
+            EvalError::ArrayOutOfBounds(_, _) => "ArrayOutOfBounds",
+        }
+    }
+}
+
+fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
     match op {
         &tokenizer::Ops::OpAddi => eval_addi(stack),
         &tokenizer::Ops::OpAddf => eval_addf(stack),
@@ -96,7 +126,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) {
         &tokenizer::Ops::OpSqrt => eval_sqrt(stack),
         &tokenizer::Ops::OpSubi => eval_subi(stack),
         &tokenizer::Ops::OpSubf => eval_subf(stack),
-        _ => panic!("operator {:?} not implemented yet!", op),
+        op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
 
@@ -175,208 +205,236 @@ fn move_node(v: Value) -> Box<primitives::Node> {
     }
 }
 
-fn eval_if(stack: &mut Stack) {
-    let c2 = stack.pop().unwrap();
-    let c1 = stack.pop().unwrap();
-    let pred = stack.pop().unwrap();
+fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
+    let c2 = pop(stack)?;
+    let c1 = pop(stack)?;
+    let pred = pop(stack)?;
     if get_boolean(&pred) {
         match c1 {
             Value::ValClosure(mut e, f) => {
-                do_evaluate(&mut e, stack, &f);
+                Ok(do_evaluate(&mut e, stack, &f))
             }
-            _ => panic!("can't use non-function {:?} as if function", c1),
+            other => Err(EvalError::WrongType(other)),
         }
     } else {
         match c2 {
             Value::ValClosure(mut e, f) => {
-                do_evaluate(&mut e, stack, &f);
+                Ok(do_evaluate(&mut e, stack, &f))
             }
-            _ => panic!("can't use non-function {:?} as if function", c2),
+            other => Err(EvalError::WrongType(other)),
         }
     }
 }
 
-fn eval_apply(stack: &mut Stack) {
-    let c = stack.pop().unwrap();
+fn eval_apply(stack: &mut Stack) -> Result<(), EvalError> {
+    let c = pop(stack)?;
     match c {
         Value::ValClosure(mut e, f) => {
-            do_evaluate(&mut e, stack, &f);
+            Ok(do_evaluate(&mut e, stack, &f))
         }
-        _ => panic!("can't apply non-function {:?}", c),
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
-fn eval_addi(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_addi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     stack.push(Value::ValInteger(get_integer(&i1) + get_integer(&i2)));
+    Ok(())
 }
 
-fn eval_addf(stack: &mut Stack) {
-    let r2 = stack.pop().unwrap();
-    let r1 = stack.pop().unwrap();
+fn eval_addf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r2 = pop(stack)?;
+    let r1 = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r1) + get_real(&r2)));
+    Ok(())
 }
 
-fn eval_acos(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_acos(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r).acos().to_degrees()));
+    Ok(())
 }
 
-fn eval_asin(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_asin(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r).asin().to_degrees()));
+    Ok(())
 }
 
-fn eval_clampf(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_clampf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r).max(0.0).min(1.0)));
+    Ok(())
 }
 
-fn eval_cos(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_cos(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     let mut res = get_real(&r).to_radians().cos();
     if res.abs() < 1e-15 {
         res = 0.0;
     }
     stack.push(Value::ValReal(res));
+    Ok(())
 }
 
-fn eval_divi(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_divi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     stack.push(Value::ValInteger(get_integer(&i1) / get_integer(&i2)));
+    Ok(())
 }
 
-fn eval_divf(stack: &mut Stack) {
-    let r2 = stack.pop().unwrap();
-    let r1 = stack.pop().unwrap();
+fn eval_divf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r2 = pop(stack)?;
+    let r1 = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r1) / get_real(&r2)));
+    Ok(())
 }
 
-fn eval_eqi(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_eqi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     let rv = get_integer(&i1) == get_integer(&i2);
     stack.push(Value::ValBoolean(rv));
+    Ok(())
 }
 
-fn eval_eqf(stack: &mut Stack) {
-    let r2 = stack.pop().unwrap();
-    let r1 = stack.pop().unwrap();
+fn eval_eqf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r2 = pop(stack)?;
+    let r1 = pop(stack)?;
     let rv = get_real(&r1) == get_real(&r2);
     stack.push(Value::ValBoolean(rv));
+    Ok(())
 }
 
-fn eval_floor(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_floor(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValInteger(get_real(&r).floor() as i64));
+    Ok(())
 }
 
-fn eval_frac(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_frac(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r).fract()));
+    Ok(())
 }
 
-fn eval_lessi(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_lessi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     if get_integer(&i1) < get_integer(&i2) {
         stack.push(Value::ValBoolean(true));
     } else {
         stack.push(Value::ValBoolean(false));
     }
+    Ok(())
 }
 
-fn eval_lessf(stack: &mut Stack) {
-    let r2 = stack.pop().unwrap();
-    let r1 = stack.pop().unwrap();
+fn eval_lessf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r2 = pop(stack)?;
+    let r1 = pop(stack)?;
     if get_real(&r1) < get_real(&r2) {
         stack.push(Value::ValBoolean(true));
     } else {
         stack.push(Value::ValBoolean(false));
     }
+    Ok(())
 }
 
-fn eval_modi(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_modi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     stack.push(Value::ValInteger(modi(get_integer(&i1), get_integer(&i2))));
+    Ok(())
 }
 
-fn eval_muli(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_muli(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     stack.push(Value::ValInteger(get_integer(&i1) * get_integer(&i2)));
+    Ok(())
 }
 
-fn eval_mulf(stack: &mut Stack) {
-    let r2 = stack.pop().unwrap();
-    let r1 = stack.pop().unwrap();
+fn eval_mulf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r2 = pop(stack)?;
+    let r1 = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r1) * get_real(&r2)));
+    Ok(())
 }
 
-fn eval_negi(stack: &mut Stack) {
-    let i = stack.pop().unwrap();
+fn eval_negi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i = pop(stack)?;
     stack.push(Value::ValInteger(-get_integer(&i)));
+    Ok(())
 }
 
-fn eval_negf(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_negf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValReal(-get_real(&r)));
+    Ok(())
 }
 
-fn eval_real(stack: &mut Stack) {
-    let i = stack.pop().unwrap();
+fn eval_real(stack: &mut Stack) -> Result<(), EvalError> {
+    let i = pop(stack)?;
     stack.push(Value::ValReal(get_integer(&i) as f64));
+    Ok(())
 }
 
-fn eval_sin(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_sin(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     let mut res = get_real(&r).to_radians().sin();
     if res.abs() < 1e-15 {
         res = 0.0;
     }
     stack.push(Value::ValReal(res));
+    Ok(())
 }
 
-fn eval_sqrt(stack: &mut Stack) {
-    let r = stack.pop().unwrap();
+fn eval_sqrt(stack: &mut Stack) -> Result<(), EvalError> {
+    let r = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r).sqrt()));
+    Ok(())
 }
 
-fn eval_subi(stack: &mut Stack) {
-    let i2 = stack.pop().unwrap();
-    let i1 = stack.pop().unwrap();
+fn eval_subi(stack: &mut Stack) -> Result<(), EvalError> {
+    let i2 = pop(stack)?;
+    let i1 = pop(stack)?;
     stack.push(Value::ValInteger(get_integer(&i1) - get_integer(&i2)));
+    Ok(())
 }
 
-fn eval_subf(stack: &mut Stack) {
-    let r2 = stack.pop().unwrap();
-    let r1 = stack.pop().unwrap();
+fn eval_subf(stack: &mut Stack) -> Result<(), EvalError> {
+    let r2 = pop(stack)?;
+    let r1 = pop(stack)?;
     stack.push(Value::ValReal(get_real(&r1) - get_real(&r2)));
+    Ok(())
 }
 
-fn eval_point(stack: &mut Stack) {
-    let z = stack.pop().unwrap();
-    let y = stack.pop().unwrap();
-    let x = stack.pop().unwrap();
+fn eval_point(stack: &mut Stack) -> Result<(), EvalError> {
+    let z = pop(stack)?;
+    let y = pop(stack)?;
+    let x = pop(stack)?;
     stack.push(Value::ValPoint([get_real(&x), get_real(&y), get_real(&z)]));
+    Ok(())
 }
 
-fn eval_getx(stack: &mut Stack) {
-    let p = stack.pop().unwrap();
+fn eval_getx(stack: &mut Stack) -> Result<(), EvalError> {
+    let p = pop(stack)?;
     stack.push(Value::ValReal(get_point_x(&p)));
+    Ok(())
 }
 
-fn eval_gety(stack: &mut Stack) {
-    let p = stack.pop().unwrap();
+fn eval_gety(stack: &mut Stack) -> Result<(), EvalError> {
+    let p = pop(stack)?;
     stack.push(Value::ValReal(get_point_y(&p)));
+    Ok(())
 }
 
-fn eval_getz(stack: &mut Stack) {
-    let p = stack.pop().unwrap();
+fn eval_getz(stack: &mut Stack) -> Result<(), EvalError> {
+    let p = pop(stack)?;
     stack.push(Value::ValReal(get_point_z(&p)));
+    Ok(())
 }
 
 fn get_array(v: &Value) -> &Vec<Value> {
@@ -398,27 +456,28 @@ fn move_lights(v: Value) -> Vec<Box<lights::Light>> {
     }
 }
 
-fn eval_get(stack: &mut Stack) {
-    let i = stack.pop().unwrap();
-    let a = stack.pop().unwrap();
+fn eval_get(stack: &mut Stack) -> Result<(), EvalError> {
+    let i = pop(stack)?;
+    let a = pop(stack)?;
     let iv = get_integer(&i);
     let av = get_array(&a);
     if iv < 0 || iv > av.len() as i64 {
-        panic!("array subscript error: len: {:?}, index: {:?}",
-               av.len(),
-               iv);
+        return Err(EvalError::ArrayOutOfBounds(iv, av.len()));
     }
     stack.push(av[iv as usize].clone());
+    Ok(())
 }
 
-fn eval_length(stack: &mut Stack) {
-    let a = stack.pop().unwrap();
+fn eval_length(stack: &mut Stack) -> Result<(), EvalError> {
+    let a = pop(stack)?;
     stack.push(Value::ValInteger(get_array(&a).len() as i64));
+    Ok(())
 }
 
-fn eval_sphere(stack: &mut Stack) {
-    let surface = stack.pop().unwrap();
+fn eval_sphere(stack: &mut Stack) -> Result<(), EvalError> {
+    let surface = pop(stack)?;
     stack.push(Value::ValNode(Box::new(primitives::Sphere::new(move_surface(surface)))));
+    Ok(())
 }
 
 // def eval_cube(env, stack):
@@ -492,11 +551,12 @@ fn eval_sphere(stack: &mut Stack) {
 //     obj.rotatez(get_real(d))
 //     return env, push(stack, obj)
 
-fn eval_light(stack: &mut Stack) {
-    let color = stack.pop().unwrap();
-    let d = stack.pop().unwrap();
+fn eval_light(stack: &mut Stack) -> Result<(), EvalError> {
+    let color = pop(stack)?;
+    let d = pop(stack)?;
     stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(move_point(d),
                                                                       move_point(color)))));
+    Ok(())
 }
 
 // def eval_pointlight(env, stack):
@@ -536,15 +596,15 @@ fn eval_light(stack: &mut Stack) {
 //                      get_string(file))
 //     return env, stack
 
-fn eval_render(stack: &mut Stack) {
-    let file = stack.pop().unwrap();
-    let ht = stack.pop().unwrap();
-    let wid = stack.pop().unwrap();
-    let fov = stack.pop().unwrap();
-    let depth = stack.pop().unwrap();
-    let obj = stack.pop().unwrap();
-    let lights = stack.pop().unwrap();
-    let amb = stack.pop().unwrap();
+fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
+    let file = pop(stack)?;
+    let ht = pop(stack)?;
+    let wid = pop(stack)?;
+    let fov = pop(stack)?;
+    let depth = pop(stack)?;
+    let obj = pop(stack)?;
+    let lights = pop(stack)?;
+    let amb = pop(stack)?;
     raytracer::render(move_point(amb),
                       move_lights(lights),
                       move_node(obj),
@@ -553,6 +613,7 @@ fn eval_render(stack: &mut Stack) {
                       get_integer(&wid),
                       get_integer(&ht),
                       get_string(&file));
+    Ok(())
 }
 
 // Let's move into here, to avoid one clone
@@ -566,10 +627,10 @@ fn move_surface(v: Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f6
                 stack.push(Value::ValReal(u));
                 stack.push(Value::ValReal(v));
                 do_evaluate(&mut mutable_local_env, &mut stack, &ast);
-                let n = stack.pop().unwrap();
-                let ks = stack.pop().unwrap();
-                let kd = stack.pop().unwrap();
-                let sc = stack.pop().unwrap();
+                let n = stack.pop().expect("empty stack");
+                let ks = stack.pop().expect("empty stack");
+                let kd = stack.pop().expect("empty stack");
+                let sc = stack.pop().expect("empty stack");
                 (move_point(sc), get_real(&kd), get_real(&ks), get_real(&n))
             }))
         }
@@ -595,17 +656,17 @@ fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
                     &tokenizer::Token::Boolean(v) => stack.push(Value::ValBoolean(v)),
                     &tokenizer::Token::Str(ref v) => stack.push(Value::ValString(v.clone())),
                     &tokenizer::Token::Binder(ref v) => {
-                        let i = stack.pop().unwrap();
+                        let i = stack.pop().expect("empty stack");
                         env.insert(v.clone(), i);
                     }
                     &tokenizer::Token::Identifier(ref v) => {
-                        let val = env.get(v).unwrap();
+                        let val = env.get(v).expect("environment missing identifier");
                         //                 if isinstance(e, primitives.Node):
                         //                     e = copy.deepcopy(e)
                         stack.push(val.clone())
                     }
                     &tokenizer::Token::Operator(ref v) => {
-                        eval_op(v, stack);
+                        eval_op(v, stack).expect("error evaluation op");
                     }
                     token => {
                         panic!("evaluate error, unknown token: {:?}", token);
@@ -748,5 +809,5 @@ fn test_evaluator() {
         }
         _ => assert!(false),
     }
-    let (env, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /x x } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#);
+    let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /x x } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#);
 }

@@ -1,9 +1,8 @@
 use vecmath::Vec3;
+use vecmath::neg;
 use transform::Transform;
 use std::rc::Rc;
-
-pub struct Intersection {
-}
+use std::cmp::Ordering;
 
 pub trait Node: NodeClone {
     fn name(&self) -> &str;
@@ -53,28 +52,79 @@ impl Sphere {
     }
 }
 
-// class Intersection(object):
-//     ENTRY = 0
-//     EXIT = 1
-//     def __init__(self, scale, odistance, rp, rd, primitive, t, face):
-//         self.scale = scale
-//         self.odistance = odistance
-//         self.distance = scale * odistance
-//         self.rp = rp
-//         self.rd = rd
-//         self.primitive = primitive
-//         self.t = t
-//         self.face = face
-//         self._wpos = None
-//         self._opos = None
-//         self._normal = None
+#[derive(Clone, Eq, PartialEq)]
+pub enum IntersectionType {
+    Entry,
+    Exit
+}
 
-//     def __cmp__(self, rhs):
-//         return cmp(self.distance, rhs.distance)
+#[derive(Clone)]
+pub struct Intersection {
+    scale: f64,
+    odistance: f64,
+    distance: f64,
+    rp: f64,
+    rd: f64,
+    primitive_transform: Transform,
+    t: IntersectionType,
+    wpos: Option<Vec3>,
+    opos: Option<Vec3>,
+    normal: Option<Vec3>
+}
 
-//     def __str__(self):
-//         return "%s %s %d"%(self.distance, self.primitive, self.t)
-//         return "%s %s %s %s %s %s"%(self.distance, self.wpos, self.opos, self.normal, self.primitive, self.t)
+impl PartialOrd for Intersection {
+    fn partial_cmp(&self, other: &Intersection) -> Option<Ordering> {
+        self.distance.partial_cmp(&other.distance)
+    }
+}
+
+impl PartialEq for Intersection {
+    fn eq(&self, other: &Intersection) -> bool {
+        self.distance == other.distance
+    }
+}
+
+impl Intersection {
+    pub fn new(
+        scale: f64,
+        odistance: f64,
+        rp: f64,
+        rd: f64,
+        primitive_transform: Transform,
+        t: IntersectionType
+    ) -> Intersection {
+        Intersection {
+            scale: scale,
+            odistance: odistance,
+            distance: scale * odistance,
+            rp: rp,
+            rd: rd,
+            primitive_transform: primitive_transform,
+            t: t,
+            wpos: None,
+            opos: None,
+            normal: None
+        }
+    }
+
+    fn switch(&mut self, t: IntersectionType) {
+        if self.t != t {
+            self.t = t;
+            self.normal = Some(neg(self.get_normal()));
+        }
+    }
+
+    fn get_normal(&mut self) -> Vec3 {
+        if let Some(normal) = self.normal {
+            normal
+        } else {
+            // TODO: actually calculate it
+            let normal = [1.0, 2.0, 3.0];
+            self.normal = Some(normal);
+            normal
+        }
+    }
+}
 
 //     def switch(self, t):
 //         if self.t != t:
@@ -599,3 +649,12 @@ impl Node for Sphere {
 
 //     def get_normal(self, i):
 //         return normalize(self.transform.transform_normal(self.np))
+
+#[test]
+fn test_intersection() {
+    let mut i = Intersection::new(2.0, 3.0, 1.0, 1.0, Default::default(), IntersectionType::Entry);
+    assert!(i.distance == 6.0);
+    assert!(i.t == IntersectionType::Entry);
+    i.switch(IntersectionType::Exit);
+    assert!(i.t == IntersectionType::Exit);
+}

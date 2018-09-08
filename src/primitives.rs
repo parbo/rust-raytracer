@@ -1,5 +1,4 @@
-use vecmath::Vec3;
-use vecmath::neg;
+use vecmath::{Vec3, add, mul, neg};
 use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
@@ -63,8 +62,8 @@ pub struct Intersection {
     scale: f64,
     odistance: f64,
     distance: f64,
-    rp: f64,
-    rd: f64,
+    rp: Vec3,
+    rd: Vec3,
     primitive_transform: Transform,
     t: IntersectionType,
     wpos: Option<Vec3>,
@@ -88,8 +87,8 @@ impl Intersection {
     pub fn new(
         scale: f64,
         odistance: f64,
-        rp: f64,
-        rd: f64,
+        rp: Vec3,
+        rd: Vec3,
         primitive_transform: Transform,
         t: IntersectionType
     ) -> Intersection {
@@ -124,38 +123,28 @@ impl Intersection {
             normal
         }
     }
+
+    fn get_opos(&mut self) -> Vec3 {
+        if let Some(opos) = self.opos {
+            opos
+        } else {
+            let opos = add(self.rp, mul(self.rd, self.odistance));
+            self.opos = Some(opos);
+            opos
+        }
+    }
+
+    fn get_wpos(&mut self) -> Vec3 {
+        if let Some(wpos) = self.wpos {
+            wpos
+        } else {
+            let opos = self.get_opos();
+            let wpos = self.primitive_transform.transform_point(opos);
+            self.wpos = Some(wpos);
+            wpos
+        }
+    }
 }
-
-//     def switch(self, t):
-//         if self.t != t:
-//             self.t = t
-//             self._normal = neg(self.normal)
-
-//     def opos():
-//         def fget(self):
-//             if not self._opos:
-//                 self._opos = add(self.rp, mul(self.rd, self.odistance))
-//             return self._opos
-//         return locals()
-//     opos = property(**opos())
-
-//     def wpos():
-//         def fget(self):
-//             opos = self.opos
-//             if not self._wpos:
-//                 self._wpos = self.primitive.transform.transform_point(opos)
-//             return self._wpos
-//         return locals()
-//     wpos = property(**wpos())
-
-//     def normal():
-//         def fget(self):
-//             if not self._normal:
-//                 self._normal = self.primitive.get_normal(self)
-//             return self._normal
-//         return locals()
-//     normal = property(**normal())
-
 
 // class Node(object):
 //     def intersect(self, raypos, raydir):
@@ -652,7 +641,13 @@ impl Node for Sphere {
 
 #[test]
 fn test_intersection() {
-    let mut i = Intersection::new(2.0, 3.0, 1.0, 1.0, Default::default(), IntersectionType::Entry);
+    let mut i = Intersection::new(
+        2.0,
+        3.0,
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        Default::default(),
+        IntersectionType::Entry);
     assert!(i.distance == 6.0);
     assert!(i.t == IntersectionType::Entry);
     i.switch(IntersectionType::Exit);

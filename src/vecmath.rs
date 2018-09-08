@@ -13,6 +13,7 @@ pub use self::vecmath_lib::vec3_square_len as square_length;
 pub use self::vecmath_lib::vec3_sub as sub;
 pub use self::vecmath_lib::mat4_id as identity;
 pub use self::vecmath_lib::col_mat4_mul as mmmul;
+pub use self::vecmath_lib::row_mat4_transform as transform;
 
 // pub fn length(v: Vec3) -> f64 {
 //     square_length(v).sqrt()

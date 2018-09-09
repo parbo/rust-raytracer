@@ -1,12 +1,13 @@
-use vecmath::{normalize, Vec3};
+use vecmath::{normalize, Vec3, mul, cmul};
 use std::path::Path;
 use std::io::{Write, Result};
 use std::fs::File;
 use std::rc::Rc;
-use primitives::{Node, Sphere};
+use primitives::{Node, Sphere, IntersectionType};
 use lights::{Light, DirectionalLight};
 
 type Pixel = [f64; 3];
+type Color = [f64; 3];
 
 fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()> {
     let path = Path::new(filename);
@@ -22,14 +23,58 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()
     Ok(())
 }
 
-fn trace(_amb: Vec3,
+fn get_ambient(c: Vec3, ia: Vec3, kd: f64) -> Color {
+    return mul(cmul(ia, c), kd)
+}
+
+fn trace(amb: Vec3,
          _lights: &[Box<Light>],
-         _scene: &Node,
+         scene: &Node,
          _depth: i64,
-         _raypos: Vec3,
-         _raydir: Vec3)
+         raypos: Vec3,
+         raydir: Vec3)
          -> Pixel {
-    [1.0, 0.0, 0.0]
+    let mut i = scene.intersect(raypos, raydir);
+    // for ii in i.iter_mut() {
+    //     let wpos = ii.get_wpos();
+    //     println!("Intersection type: {:?}, pos: {:?}, distance: {:?}", ii.t, wpos, ii.distance);
+    // }
+    if i.len() > 0 {
+        let ref isect = &i[0];
+        if isect.t == IntersectionType::Exit {
+            return [0.0, 0.0, 0.0];
+        }
+//        let (sc, kd, ks, n) = isect.primitive.get_surface(isect);
+        let (sc, kd, _ks, _n) =  ([0.1, 0.1, 1.0], 0.3, 0.2, 6.0);
+        let c = get_ambient(sc, amb, kd);
+        return c;  // No lights
+        // diffuse = (0.0, 0.0, 0.0)
+        // specular = (0.0, 0.0, 0.0)
+        // pos = isect.wpos
+        // normal = isect.normal
+        // for light in lights:
+        //     lightdir, lightdistance = light.get_direction(pos)
+        //     df = dot(normal, lightdir)
+        //     if df > 0.0:
+        //         poseps = add(pos, mul(lightdir, 1e-7))
+        //         i = scene.intersect(poseps, lightdir)
+        //         if not i or (lightdistance and (lightdistance < i[0].distance)):
+        //             ic = cmul(sc, light.get_intensity(pos))
+        //             if kd > 0.0:
+        //                 diffuse = add(diffuse, mul(ic, df))
+        //             if ks > 0.0:
+        //                 specular = add(specular, get_specular(ic, lightdir, normal, pos, raypos, n))
+        // c = add(c, add(mul(diffuse, kd), mul(specular, ks)))
+        // if ks > 0.0 and depth > 0:
+        //     refl_raydir = normalize(sub(raydir, mul(normal, 2 * dot(raydir, normal))))
+        //     poseps = add(pos, mul(refl_raydir, 1e-7))
+        //     rc = trace(amb, lights, scene, depth - 1, poseps, refl_raydir)
+        //     return add(c, mul(cmul(rc, sc), ks))
+        // else:
+        //     return c
+    } else {
+        return [0.0, 0.0, 0.0];
+    }
 }
 
 pub fn render(amb: Vec3,
@@ -81,10 +126,16 @@ fn test_ppm() {
     write_ppm_file(&pixels, 256, 256, "test.ppm").expect("failed to write file");
 }
 
+#[cfg(test)]
+fn render_scene(lights: Vec<Box<Light>>, mut scene: Box<Node>, name: &str) {
+    scene.translate(0.0, 0.0, 3.0);
+    render([1.0, 1.0, 1.0], lights, scene, 3, 90.0, 256, 256, name);
+}
+
 #[test]
 fn test_raytrace() {
     let mut lights : Vec<Box<Light>> = Vec::new();
     lights.push(Box::new(DirectionalLight::new([1.0, 0.0, 0.0], [0.3, 0.4, 0.5])));
-    let obj = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
-    render([0.7, 0.8, 0.3], lights, obj, 3, 90.0, 256, 256, "raytrace.ppm");
+    let scene = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
+    render_scene(lights, scene, "scene_sphere.ppm");
 }

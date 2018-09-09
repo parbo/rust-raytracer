@@ -9,6 +9,7 @@ pub trait Node: NodeClone {
     fn name(&self) -> &str;
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
     fn inside(&self, pos: Vec3) -> bool;
+    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64);
     fn translate(&mut self, tx: f64, ty: f64, tz: f64);
     fn scale(&mut self, sx: f64, sy: f64, sz: f64);
     fn uscale(&mut self, s: f64);
@@ -53,7 +54,7 @@ impl Sphere {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IntersectionType {
     Entry,
     Exit
@@ -63,12 +64,12 @@ pub enum IntersectionType {
 pub struct Intersection {
     scale: f64,
     odistance: f64,
-    distance: f64,
+    pub distance: f64,
     rp: Vec3,
     rd: Vec3,
     primitive_transform: Transform,
-    t: IntersectionType,
-    face: i64,  // Todo: maybe use a type instea
+    pub t: IntersectionType,
+    pub face: i64,  // Todo: maybe use a type instea
     wpos: Cell<Option<Vec3>>,
     opos: Cell<Option<Vec3>>,
     normal: Cell<Option<Vec3>>
@@ -111,14 +112,14 @@ impl Intersection {
         }
     }
 
-    fn switch(&mut self, t: IntersectionType) {
+    pub fn switch(&mut self, t: IntersectionType) {
         if self.t != t {
             self.t = t;
             self.normal.set(Some(neg(self.get_normal())));
         }
     }
 
-    fn get_normal(&self) -> Vec3 {
+    pub fn get_normal(&self) -> Vec3 {
         if let Some(normal) = self.normal.get() {
             normal
         } else {
@@ -129,7 +130,7 @@ impl Intersection {
         }
     }
 
-    fn get_opos(&self) -> Vec3 {
+    pub fn get_opos(&self) -> Vec3 {
         if let Some(opos) = self.opos.get() {
             opos
         } else {
@@ -139,7 +140,7 @@ impl Intersection {
         }
     }
 
-    fn get_wpos(&self) -> Vec3 {
+    pub fn get_wpos(&self) -> Vec3 {
         if let Some(wpos) = self.wpos.get() {
             wpos
         } else {
@@ -319,6 +320,12 @@ impl Node for Sphere {
     fn inside(&self, pos: Vec3) -> bool {
         let transformed_pos = self.transform.inv_transform_point(pos);
         dot(transformed_pos, transformed_pos) <= 1.0
+    }
+    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+        let [x, y, z] = opos;
+        let v = (y + 1.0) / 2.0;
+        let u = x.atan2(z);
+        (self.surface)(face, u, v)
     }
     fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
         self.transform.translate(tx, ty, tz);

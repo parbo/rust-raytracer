@@ -18,3 +18,9 @@ pub use self::vecmath_lib::row_mat4_transform as transform;
 pub fn length(v: Vec3) -> f64 {
     square_length(v).sqrt()
 }
+
+pub fn cmul(v1: Vec3, v2: Vec3) -> Vec3 {
+    let [x1, y1, z1] = v1;
+    let [x2, y2, z2] = v2;
+    [x1*x2, y1*y2, z1*z2]
+}

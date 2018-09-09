@@ -1,4 +1,4 @@
-use vecmath::{Vec3, add, dot, mul, neg, length};
+use vecmath::{Vec3, add, dot, mul, neg, length, normalize};
 use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
@@ -36,6 +36,8 @@ pub trait Node: NodeClone {
     fn rotatex(&mut self, d: f64);
     fn rotatey(&mut self, d: f64);
     fn rotatez(&mut self, d: f64);
+    fn transform_point(&self, p: Vec3) -> Vec3;
+    fn get_normal(&self, p: Vec3) -> Vec3;
 }
 
 pub trait NodeClone {
@@ -368,6 +370,14 @@ impl Node for Sphere {
     fn rotatex(&mut self, _d: f64) {}
     fn rotatey(&mut self, _d: f64) {}
     fn rotatez(&mut self, _d: f64) {}
+
+    fn transform_point(&self, p: Vec3) -> Vec3 {
+        self.transform.transform_point(p)
+    }
+
+    fn get_normal(&self, p: Vec3) -> Vec3 {
+        normalize(self.transform.transform_normal(p))
+    }
 }
 // class Sphere(Primitive):
 //     def intersect(self, raypos, raydir):

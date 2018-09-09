@@ -1,4 +1,4 @@
-use vecmath::{normalize, Vec3, mul, cmul};
+use vecmath::{normalize, Vec3, mul, cmul, dot, add, sub};
 use std::path::Path;
 use std::io::{Write, Result};
 use std::fs::File;
@@ -27,45 +27,68 @@ fn get_ambient(c: Vec3, ia: Vec3, kd: f64) -> Color {
     return mul(cmul(ia, c), kd)
 }
 
+fn get_specular(ic: Color, lightdir: Vec3, sn: Vec3, pos: Vec3, raypos: Vec3, n: f64) -> Color {
+    let halfway = normalize(add(lightdir, normalize(sub(raypos, pos))));
+    let sp = dot(sn, halfway);
+    if sp > 0.0 {
+        mul(ic, sp.powf(n))
+    } else {
+        [0.0, 0.0, 0.0]
+    }
+}
+
 fn trace(amb: Vec3,
-         _lights: &[Box<Light>],
+         lights: &[Box<Light>],
          scene: &Node,
          _depth: i64,
          raypos: Vec3,
          raydir: Vec3)
          -> Pixel {
-    let mut i = scene.intersect(raypos, raydir);
-    // for ii in i.iter_mut() {
-    //     let wpos = ii.get_wpos();
-    //     println!("Intersection type: {:?}, pos: {:?}, distance: {:?}", ii.t, wpos, ii.distance);
-    // }
+    let i = scene.intersect(raypos, raydir);
     if i.len() > 0 {
         let ref isect = &i[0];
         if isect.t == IntersectionType::Exit {
             return [0.0, 0.0, 0.0];
         }
         let node = scene.find_node(isect.primitive_id).unwrap();
-        let (sc, kd, _ks, _n) = node.get_surface(isect.get_opos(), isect.face);
-//        let (sc, kd, _ks, _n) =  ([0.1, 0.1, 1.0], 0.3, 0.2, 6.0);
-        let c = get_ambient(sc, amb, kd);
-        return c;  // No lights
-        // diffuse = (0.0, 0.0, 0.0)
-        // specular = (0.0, 0.0, 0.0)
-        // pos = isect.wpos
-        // normal = isect.normal
-        // for light in lights:
-        //     lightdir, lightdistance = light.get_direction(pos)
-        //     df = dot(normal, lightdir)
-        //     if df > 0.0:
-        //         poseps = add(pos, mul(lightdir, 1e-7))
-        //         i = scene.intersect(poseps, lightdir)
-        //         if not i or (lightdistance and (lightdistance < i[0].distance)):
-        //             ic = cmul(sc, light.get_intensity(pos))
-        //             if kd > 0.0:
-        //                 diffuse = add(diffuse, mul(ic, df))
-        //             if ks > 0.0:
-        //                 specular = add(specular, get_specular(ic, lightdir, normal, pos, raypos, n))
-        // c = add(c, add(mul(diffuse, kd), mul(specular, ks)))
+        let opos = isect.get_opos();
+        let (sc, kd, ks, n) = node.get_surface(opos, isect.face);
+        let mut c = get_ambient(sc, amb, kd);
+        let mut diffuse = [0.0, 0.0, 0.0];
+        let mut specular = [0.0, 0.0, 0.0];
+        let pos = node.transform_point(opos);
+        let normal = node.get_normal(opos);
+        for light in lights.iter() {
+            let (lightdir, lightdistance) = light.get_direction(pos);
+            let df = dot(normal, lightdir);
+            if df > 0.0 {
+                let poseps = add(pos, mul(lightdir, 1e-7));
+                let lighti = scene.intersect(poseps, lightdir);
+                // This must be possible to do more nicely
+                let mut do_lights = lighti.len() == 0;
+                if !do_lights {
+                    if let Some(ld) = lightdistance {
+                        if ld < i[0].distance {
+                            do_lights = true;
+                        }
+                    }
+                }
+                if do_lights {
+                    let ic = cmul(sc, light.get_intensity(pos));
+                    if kd > 0.0 {
+                        diffuse = add(diffuse, mul(ic, df));
+                    }
+                    if ks > 0.0 {
+                        specular = add(specular, get_specular(ic, lightdir, normal, pos, raypos, n));
+                    }
+                }
+            }
+        }
+        let diff = mul(diffuse, kd);
+        let spec = mul(specular, ks);
+        let combined = add(diff, spec);
+        c = add(c, combined);
+        c
         // if ks > 0.0 and depth > 0:
         //     refl_raydir = normalize(sub(raydir, mul(normal, 2 * dot(raydir, normal))))
         //     poseps = add(pos, mul(refl_raydir, 1e-7))

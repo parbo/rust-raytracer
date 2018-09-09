@@ -126,6 +126,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpSqrt => eval_sqrt(stack),
         &tokenizer::Ops::OpSubi => eval_subi(stack),
         &tokenizer::Ops::OpSubf => eval_subf(stack),
+        &tokenizer::Ops::OpTranslate => eval_translate(stack),
         op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
@@ -511,6 +512,20 @@ fn eval_sphere(stack: &mut Stack) -> Result<(), EvalError> {
 //     obj1, stack = pop(stack)
 //     return env, push(stack, primitives.Difference(obj1, obj2))
 
+fn eval_translate(stack: &mut Stack) -> Result<(), EvalError> {
+    let tz = pop(stack)?;
+    let ty = pop(stack)?;
+    let tx = pop(stack)?;
+    let obj = pop(stack)?;
+    match obj {
+        Value::ValNode(mut node) => {
+            node.translate(get_real(&tx), get_real(&ty), get_real(&tz));
+            stack.push(Value::ValNode(node));
+            Ok(())
+        },
+        other => Err(EvalError::WrongType(other))
+    }
+}
 // def eval_translate(env, stack):
 //     tz, stack = pop(stack)
 //     ty, stack = pop(stack)

@@ -705,124 +705,202 @@ pub fn run(gml: &str) -> (Env, Stack) {
     evaluate(&parser::parse(&tokenizer::tokenize(gml)))
 }
 
-#[test]
-fn test_evaluator() {
-    let (env, _) = run("1 /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValInteger(1));
-    let (env, _) = run(r#""apa" /x"#);
-    assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
-    assert_eq!(*get_string(env.get("x").unwrap()), "apa".to_string());
-    let (_, stack) = run("1 2 addi");
-    assert_eq!(stack, vec![Value::ValInteger(3)]);
-    let (_, stack) = run("1.5 2.5 addf");
-    assert_eq!(stack, vec![Value::ValReal(4.0)]);
-    let (_, stack) = run("1 /x x x addi");
-    assert_eq!(stack, vec![Value::ValInteger(2)]);
-    let (_, stack) = run("1 { /x x x } apply");
-    assert_eq!(stack, vec![Value::ValInteger(1), Value::ValInteger(1)]);
-    let (_, stack) = run("true { 1 } { 2 } if");
-    assert_eq!(stack, vec![Value::ValInteger(1)]);
-    let (_, stack) = run("false { 1 } { 2 } if");
-    assert_eq!(stack, vec![Value::ValInteger(2)]);
-    let (_, stack) = run("1 2 eqi");
-    assert_eq!(stack, vec![Value::ValBoolean(false)]);
-    let (_, stack) = run("5 5 eqi");
-    assert_eq!(stack, vec![Value::ValBoolean(true)]);
-    let (_, stack) = run("1.5 2.7 eqf");
-    assert_eq!(stack, vec![Value::ValBoolean(false)]);
-    let (_, stack) = run("5.123 5.123 eqf");
-    assert_eq!(stack, vec![Value::ValBoolean(true)]);
-    let (_, stack) = run("2 1 lessi");
-    assert_eq!(stack, vec![Value::ValBoolean(false)]);
-    let (_, stack) = run("2 2 lessi");
-    assert_eq!(stack, vec![Value::ValBoolean(false)]);
-    let (_, stack) = run("1 2 lessi");
-    assert_eq!(stack, vec![Value::ValBoolean(true)]);
-    let (_, stack) = run("2.0 1.0 lessf");
-    assert_eq!(stack, vec![Value::ValBoolean(false)]);
-    let (_, stack) = run("2.0 2.0 lessf");
-    assert_eq!(stack, vec![Value::ValBoolean(false)]);
-    let (_, stack) = run("1.0 2.0 lessf");
-    assert_eq!(stack, vec![Value::ValBoolean(true)]);
-    run("false /b b { 1 } { 2 } if");
-    run("4 /x 2 x addi");
-    run("1 { /x x x } apply addi");
-    run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply");
-    run("{ /x /y x y } /swap 3 4 swap apply");
-    run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact \
-         apply");
-    for ui in 0..10 {
-        for vi in 0..10 {
-            let u = ui as f64;
-            let v = vi as f64;
-            // Implement a small program
-            // Escaping { in format strings is done by adding an extra brace -> {{
-            let prog = format!("1 /col1 2 /col2 {:.1} /u {:.1} /v {{ /y /x x x mulf y y mulf \
-                                addf sqrt }} /dist \n {{ \n u 0.5 subf /u v 0.5 subf /v \n u u v \
-                                dist apply divf /b \n 0.0 v lessf {{ b asin }} {{ 360.0 b asin \
-                                subf }} if 180.0 addf 30.0 divf \n floor 2 modi 1 eqi {{ col1 }} \
-                                {{ col2 }} if \n }} apply",
-                               u / 10.0,
-                               v / 10.0);
-            // Implement the same program in rust:
-            fn test(u: f64, v: f64) -> i64 {
-                let u = u - 0.5;
-                let v = v - 0.5;
-                let b = u / (u * u + v * v).sqrt();
-                let mut c: f64;
-                if 0.0 < v {
-                    c = b.asin().to_degrees();
-                } else {
-                    c = 360.0 - b.asin().to_degrees();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bind_integer() {
+        let (env, _) = run("1 /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(1));
+    }
+
+    #[test]
+    fn test_bind_string() {
+        let (env, _) = run(r#""apa" /x"#);
+        assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
+        assert_eq!(*get_string(env.get("x").unwrap()), "apa".to_string());
+    }
+
+    #[test]
+    fn test_addi() {
+        let (_, stack) = run("1 2 addi");
+        assert_eq!(stack, vec![Value::ValInteger(3)]);
+    }
+
+    #[test]
+    fn test_addf() {
+        let (_, stack) = run("1.5 2.5 addf");
+        assert_eq!(stack, vec![Value::ValReal(4.0)]);
+    }
+
+    #[test]
+    fn test_ref() {
+        let (_, stack) = run("1 /x x x addi");
+        assert_eq!(stack, vec![Value::ValInteger(2)]);
+    }
+
+    #[test]
+    fn test_apply() {
+        let (_, stack) = run("1 { /x x x } apply");
+        assert_eq!(stack, vec![Value::ValInteger(1), Value::ValInteger(1)]);
+    }
+
+    #[test]
+    fn test_if() {
+        let (_, stack) = run("true { 1 } { 2 } if");
+        assert_eq!(stack, vec![Value::ValInteger(1)]);
+        let (_, stack) = run("false { 1 } { 2 } if");
+        assert_eq!(stack, vec![Value::ValInteger(2)]);
+    }
+
+    #[test]
+    fn test_eqi() {
+        let (_, stack) = run("1 2 eqi");
+        assert_eq!(stack, vec![Value::ValBoolean(false)]);
+        let (_, stack) = run("5 5 eqi");
+        assert_eq!(stack, vec![Value::ValBoolean(true)]);
+    }
+
+    #[test]
+    fn test_eqf() {
+        let (_, stack) = run("1.5 2.7 eqf");
+        assert_eq!(stack, vec![Value::ValBoolean(false)]);
+        let (_, stack) = run("5.123 5.123 eqf");
+        assert_eq!(stack, vec![Value::ValBoolean(true)]);
+    }
+
+    #[test]
+    fn test_lessi() {
+        let (_, stack) = run("2 1 lessi");
+        assert_eq!(stack, vec![Value::ValBoolean(false)]);
+        let (_, stack) = run("2 2 lessi");
+        assert_eq!(stack, vec![Value::ValBoolean(false)]);
+        let (_, stack) = run("1 2 lessi");
+        assert_eq!(stack, vec![Value::ValBoolean(true)]);
+    }
+
+    #[test]
+    fn test_lessf() {
+        let (_, stack) = run("2.0 1.0 lessf");
+        assert_eq!(stack, vec![Value::ValBoolean(false)]);
+        let (_, stack) = run("2.0 2.0 lessf");
+        assert_eq!(stack, vec![Value::ValBoolean(false)]);
+        let (_, stack) = run("1.0 2.0 lessf");
+        assert_eq!(stack, vec![Value::ValBoolean(true)]);
+    }
+
+    #[test]
+    fn test_successful_run() {
+        run("false /b b { 1 } { 2 } if");
+        run("4 /x 2 x addi");
+        run("1 { /x x x } apply addi");
+        run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply");
+        run("{ /x /y x y } /swap 3 4 swap apply");
+        run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact \
+             apply");
+    }
+
+    #[test]
+    fn test_small_program() {
+        for ui in 0..10 {
+            for vi in 0..10 {
+                let u = ui as f64;
+                let v = vi as f64;
+                // Implement a small program
+                // Escaping { in format strings is done by adding an extra brace -> {{
+                let prog = format!("1 /col1 2 /col2 {:.1} /u {:.1} /v {{ /y /x x x mulf y y mulf \
+                                    addf sqrt }} /dist \n {{ \n u 0.5 subf /u v 0.5 subf /v \n u u v \
+                                    dist apply divf /b \n 0.0 v lessf {{ b asin }} {{ 360.0 b asin \
+                                    subf }} if 180.0 addf 30.0 divf \n floor 2 modi 1 eqi {{ col1 }} \
+                                    {{ col2 }} if \n }} apply",
+                                   u / 10.0,
+                                   v / 10.0);
+                // Implement the same program in rust:
+                fn test(u: f64, v: f64) -> i64 {
+                    let u = u - 0.5;
+                    let v = v - 0.5;
+                    let b = u / (u * u + v * v).sqrt();
+                    let mut c: f64;
+                    if 0.0 < v {
+                        c = b.asin().to_degrees();
+                    } else {
+                        c = 360.0 - b.asin().to_degrees();
+                    }
+                    c = c + 180.0;
+                    c = c / 30.0;
+                    let mut ci = c.floor() as i64;
+                    ci = modi(ci, 2);
+                    if ci == 1 {
+                        return 1;
+                    } else {
+                        return 2;
+                    }
                 }
-                c = c + 180.0;
-                c = c / 30.0;
-                let mut ci = c.floor() as i64;
-                ci = modi(ci, 2);
-                if ci == 1 {
-                    return 1;
-                } else {
-                    return 2;
-                }
+                // Compare results (which should be the only thing om the top of the stack)
+                let expected = test(u / 10.0, v / 10.0);
+                let (_, stack) = run(prog.as_ref());
+                assert_eq!(stack.len(), 1);
+                assert_eq!(get_integer(&stack[0]), expected);
             }
-            // Compare results (which should be the only thing om the top of the stack)
-            let expected = test(u / 10.0, v / 10.0);
-            let (_, stack) = run(prog.as_ref());
-            assert_eq!(stack.len(), 1);
-            assert_eq!(get_integer(&stack[0]), expected);
         }
     }
-    let (env, _) = run("-0.4 clampf /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.0));
-    let (env, _) = run("1.1 clampf /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
-    let (env, _) = run("0.8 clampf /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.8));
-    let (env, _) = run("[1 2 3] length /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
-    let (env, _) = run("[1 2 3] 1 get /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
-    let (env, _) = run("1.0 2.0 3.0 point /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValPoint([1.0, 2.0, 3.0]));
-    let (env, _) = run("1.0 2.0 3.0 point getx /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
-    let (env, _) = run("1.0 2.0 3.0 point gety /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValReal(2.0));
-    let (env, _) = run("1.0 2.0 3.0 point getz /x");
-    assert_eq!(env.get("x").unwrap(), &Value::ValReal(3.0));
-    let (env, _) = run("1.0 { /x x } sphere /x");
-    match env.get("x").unwrap() {
-        &Value::ValNode(ref x) => assert_eq!(x.name(), "sphere"),
-        _ => assert!(false),
+
+    #[test]
+    fn test_clampf() {
+        let (env, _) = run("-0.4 clampf /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.0));
+        let (env, _) = run("1.1 clampf /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
+        let (env, _) = run("0.8 clampf /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.8));
     }
-    let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x");
-    match env.get("x").unwrap() {
-        &Value::ValLight(ref x) => {
-            assert_eq!(x.name(), "light");
-            assert_eq!(x.get_direction([1.0, 1.0, 1.0]), ([-1.0, 0.0, 0.0], None));
-            assert_eq!(x.get_intensity([1.0, 1.0, 1.0]), [0.7, 0.5, 0.3]);
+
+    #[test]
+    fn test_array() {
+        let (env, _) = run("[1 2 3] length /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
+        let (env, _) = run("[1 2 3] 1 get /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
+    }
+
+    #[test]
+    fn test_point() {
+        let (env, _) = run("1.0 2.0 3.0 point /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValPoint([1.0, 2.0, 3.0]));
+        let (env, _) = run("1.0 2.0 3.0 point getx /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
+        let (env, _) = run("1.0 2.0 3.0 point gety /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValReal(2.0));
+        let (env, _) = run("1.0 2.0 3.0 point getz /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValReal(3.0));
+    }
+
+    #[test]
+    fn test_sphere() {
+        let (env, _) = run("1.0 { /x x } sphere /x");
+        match env.get("x").unwrap() {
+            &Value::ValNode(ref x) => assert_eq!(x.name(), "sphere"),
+            _ => assert!(false),
         }
-        _ => assert!(false),
     }
-    let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /x x } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#);
+
+    #[test]
+    fn test_light() {
+        let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x");
+        match env.get("x").unwrap() {
+            &Value::ValLight(ref x) => {
+                assert_eq!(x.name(), "light");
+                assert_eq!(x.get_direction([1.0, 1.0, 1.0]), ([-1.0, 0.0, 0.0], None));
+                assert_eq!(x.get_intensity([1.0, 1.0, 1.0]), [0.7, 0.5, 0.3]);
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_render() {
+        let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /v /u /face 0.8 0.2 v point 1.0 0.2 1.0 } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#);
+    }
 }

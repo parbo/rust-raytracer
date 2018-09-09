@@ -3,7 +3,6 @@ use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
 use std::mem;
-use std::cell::Cell;
 use std::sync::atomic::{self, AtomicUsize};
 
 static NODE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
@@ -92,10 +91,7 @@ pub struct Intersection {
     rd: Vec3,
     pub primitive_id: NodeId,
     pub t: IntersectionType,
-    pub face: i64,  // Todo: maybe use a type instea
-    wpos: Cell<Option<Vec3>>,
-    opos: Cell<Option<Vec3>>,
-    normal: Cell<Option<Vec3>>
+    pub face: i64  // Todo: maybe use a type instea
 }
 
 impl PartialOrd for Intersection {
@@ -128,51 +124,19 @@ impl Intersection {
             rd: rd,
             primitive_id: primitive_id,
             t: t,
-            face: face,
-            wpos: Cell::new(None),
-            opos: Cell::new(None),
-            normal: Cell::new(None)
+            face: face
         }
     }
 
     pub fn switch(&mut self, t: IntersectionType) {
         if self.t != t {
             self.t = t;
-//            self.normal.set(Some(neg(self.get_normal())));
         }
     }
-
-    // pub fn get_normal(&self) -> Vec3 {
-    //     if let Some(normal) = self.normal.get() {
-    //         normal
-    //     } else {
-    //         // TODO: actually calculate it
-    //         let normal = [1.0, 2.0, 3.0];
-    //         self.normal.set(Some(normal));
-    //         normal
-    //     }
-    // }
 
     pub fn get_opos(&self) -> Vec3 {
-        if let Some(opos) = self.opos.get() {
-            opos
-        } else {
-            let opos = add(self.rp, mul(self.rd, self.odistance));
-            self.opos.set(Some(opos));
-            opos
-        }
+        add(self.rp, mul(self.rd, self.odistance))
     }
-
-    // pub fn get_wpos(&self) -> Vec3 {
-    //     if let Some(wpos) = self.wpos.get() {
-    //         wpos
-    //     } else {
-    //         let opos = self.get_opos();
-    //         let wpos = self.primitive_transform.transform_point(opos);
-    //         self.wpos.set(Some(wpos));
-    //         wpos
-    //     }
-    // }
 }
 
 // class Node(object):

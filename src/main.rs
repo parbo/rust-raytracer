@@ -7,7 +7,17 @@ mod vecmath;
 mod transform;
 mod lights;
 
-#[cfg(not(test))]
+use std::env;
+use std::fs::File;
+use std::io::prelude::*;
+
 fn main() {
-    //    println!("ast: {:?}", parser::parse(tokenizer::tokenize("{1 [2 3]}")));
+    let args: Vec<String> = env::args().collect();
+
+    let filename = &args[1];
+    let mut f = File::open(filename).expect("file not found");
+    let mut contents = String::new();
+    f.read_to_string(&mut contents)
+        .expect("something went wrong reading the file");
+    evaluator::run(&contents);
 }

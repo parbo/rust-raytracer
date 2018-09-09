@@ -4,9 +4,29 @@ use std::rc::Rc;
 use std::cmp::Ordering;
 use std::mem;
 use std::cell::Cell;
+use std::sync::atomic::{self, AtomicUsize};
+
+static NODE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+
+#[derive(Debug, PartialEq, Copy)]
+pub struct NodeId(usize);
+
+impl NodeId {
+    fn new() -> Self {
+        NodeId(NODE_COUNTER.fetch_add(1, atomic::Ordering::SeqCst))
+    }
+}
+
+impl Clone for NodeId {
+    fn clone(&self) -> NodeId {
+        NodeId::new()
+    }
+}
 
 pub trait Node: NodeClone {
     fn name(&self) -> &str;
+    fn id(&self) -> NodeId;
+    fn find_node(&self, id: NodeId) -> Option<&Node>;
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
     fn inside(&self, pos: Vec3) -> bool;
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64);
@@ -45,12 +65,13 @@ impl Clone for Box<Node> {
 #[derive(Clone)]
 pub struct Sphere {
     transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    id: NodeId
 }
 
 impl Sphere {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
-        Sphere { transform: Default::default(), surface: surface }
+        Sphere { transform: Default::default(), surface: surface, id: NodeId::new() }
     }
 }
 
@@ -67,7 +88,7 @@ pub struct Intersection {
     pub distance: f64,
     rp: Vec3,
     rd: Vec3,
-    primitive_transform: Transform,
+    pub primitive_id: NodeId,
     pub t: IntersectionType,
     pub face: i64,  // Todo: maybe use a type instea
     wpos: Cell<Option<Vec3>>,
@@ -93,7 +114,7 @@ impl Intersection {
         odistance: f64,
         rp: Vec3,
         rd: Vec3,
-        primitive_transform: Transform,
+        primitive_id: NodeId,
         t: IntersectionType,
         face: i64
     ) -> Intersection {
@@ -103,7 +124,7 @@ impl Intersection {
             distance: scale * odistance,
             rp: rp,
             rd: rd,
-            primitive_transform: primitive_transform,
+            primitive_id: primitive_id,
             t: t,
             face: face,
             wpos: Cell::new(None),
@@ -115,20 +136,20 @@ impl Intersection {
     pub fn switch(&mut self, t: IntersectionType) {
         if self.t != t {
             self.t = t;
-            self.normal.set(Some(neg(self.get_normal())));
+//            self.normal.set(Some(neg(self.get_normal())));
         }
     }
 
-    pub fn get_normal(&self) -> Vec3 {
-        if let Some(normal) = self.normal.get() {
-            normal
-        } else {
-            // TODO: actually calculate it
-            let normal = [1.0, 2.0, 3.0];
-            self.normal.set(Some(normal));
-            normal
-        }
-    }
+    // pub fn get_normal(&self) -> Vec3 {
+    //     if let Some(normal) = self.normal.get() {
+    //         normal
+    //     } else {
+    //         // TODO: actually calculate it
+    //         let normal = [1.0, 2.0, 3.0];
+    //         self.normal.set(Some(normal));
+    //         normal
+    //     }
+    // }
 
     pub fn get_opos(&self) -> Vec3 {
         if let Some(opos) = self.opos.get() {
@@ -140,16 +161,16 @@ impl Intersection {
         }
     }
 
-    pub fn get_wpos(&self) -> Vec3 {
-        if let Some(wpos) = self.wpos.get() {
-            wpos
-        } else {
-            let opos = self.get_opos();
-            let wpos = self.primitive_transform.transform_point(opos);
-            self.wpos.set(Some(wpos));
-            wpos
-        }
-    }
+    // pub fn get_wpos(&self) -> Vec3 {
+    //     if let Some(wpos) = self.wpos.get() {
+    //         wpos
+    //     } else {
+    //         let opos = self.get_opos();
+    //         let wpos = self.primitive_transform.transform_point(opos);
+    //         self.wpos.set(Some(wpos));
+    //         wpos
+    //     }
+    // }
 }
 
 // class Node(object):
@@ -287,6 +308,18 @@ impl Node for Sphere {
         return "sphere";
     }
 
+    fn id(&self) -> NodeId {
+        self.id
+    }
+
+    fn find_node(&self, id: NodeId) -> Option<&Node> {
+        if id == self.id {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
         let tr = &self.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
@@ -310,10 +343,10 @@ impl Node for Sphere {
         }
         let mut ts = vec![];
         if t1 > 0.0 {
-            ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, tr.clone(), IntersectionType::Entry, 0));
+            ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Entry, 0));
         }
         if t2 > 0.0 {
-            ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, tr.clone(), IntersectionType::Exit, 0));
+            ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, 0));
         }
         ts
     }
@@ -689,7 +722,7 @@ fn test_intersection() {
         3.0,
         [1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
-        Default::default(),
+        NodeId::new(),
         IntersectionType::Entry,
         0);
     assert!(i.distance == 6.0);
@@ -704,7 +737,6 @@ fn test_intersection_sphere() {
     obj.translate(0.0, 0.0, 5.0);
     let mut intersections = obj.intersect([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
     for i in intersections.iter_mut() {
-        let wpos = i.get_wpos();
-        println!("Intersection type: {:?}, pos: {:?}, distance: {:?}", i.t, wpos, i.distance);
+        println!("Intersection type: {:?}, distance: {:?}", i.t, i.distance);
     }
 }

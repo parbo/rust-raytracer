@@ -44,8 +44,9 @@ fn trace(amb: Vec3,
         if isect.t == IntersectionType::Exit {
             return [0.0, 0.0, 0.0];
         }
-//        let (sc, kd, ks, n) = isect.primitive.get_surface(isect);
-        let (sc, kd, _ks, _n) =  ([0.1, 0.1, 1.0], 0.3, 0.2, 6.0);
+        let node = scene.find_node(isect.primitive_id).unwrap();
+        let (sc, kd, _ks, _n) = node.get_surface(isect.get_opos(), isect.face);
+//        let (sc, kd, _ks, _n) =  ([0.1, 0.1, 1.0], 0.3, 0.2, 6.0);
         let c = get_ambient(sc, amb, kd);
         return c;  // No lights
         // diffuse = (0.0, 0.0, 0.0)

@@ -3,6 +3,7 @@ use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
 use std::mem;
+use std::cell::Cell;
 
 pub trait Node: NodeClone {
     fn name(&self) -> &str;
@@ -68,9 +69,9 @@ pub struct Intersection {
     primitive_transform: Transform,
     t: IntersectionType,
     face: i64,  // Todo: maybe use a type instea
-    wpos: Option<Vec3>,
-    opos: Option<Vec3>,
-    normal: Option<Vec3>
+    wpos: Cell<Option<Vec3>>,
+    opos: Cell<Option<Vec3>>,
+    normal: Cell<Option<Vec3>>
 }
 
 impl PartialOrd for Intersection {
@@ -104,47 +105,47 @@ impl Intersection {
             primitive_transform: primitive_transform,
             t: t,
             face: face,
-            wpos: None,
-            opos: None,
-            normal: None
+            wpos: Cell::new(None),
+            opos: Cell::new(None),
+            normal: Cell::new(None)
         }
     }
 
     fn switch(&mut self, t: IntersectionType) {
         if self.t != t {
             self.t = t;
-            self.normal = Some(neg(self.get_normal()));
+            self.normal.set(Some(neg(self.get_normal())));
         }
     }
 
-    fn get_normal(&mut self) -> Vec3 {
-        if let Some(normal) = self.normal {
+    fn get_normal(&self) -> Vec3 {
+        if let Some(normal) = self.normal.get() {
             normal
         } else {
             // TODO: actually calculate it
             let normal = [1.0, 2.0, 3.0];
-            self.normal = Some(normal);
+            self.normal.set(Some(normal));
             normal
         }
     }
 
-    fn get_opos(&mut self) -> Vec3 {
-        if let Some(opos) = self.opos {
+    fn get_opos(&self) -> Vec3 {
+        if let Some(opos) = self.opos.get() {
             opos
         } else {
             let opos = add(self.rp, mul(self.rd, self.odistance));
-            self.opos = Some(opos);
+            self.opos.set(Some(opos));
             opos
         }
     }
 
-    fn get_wpos(&mut self) -> Vec3 {
-        if let Some(wpos) = self.wpos {
+    fn get_wpos(&self) -> Vec3 {
+        if let Some(wpos) = self.wpos.get() {
             wpos
         } else {
             let opos = self.get_opos();
             let wpos = self.primitive_transform.transform_point(opos);
-            self.wpos = Some(wpos);
+            self.wpos.set(Some(wpos));
             wpos
         }
     }

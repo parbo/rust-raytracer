@@ -1,5 +1,3 @@
-extern crate core;
-
 #[derive(PartialEq, Debug, Clone)]
 pub enum Ops {
     OpAcos,

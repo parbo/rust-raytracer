@@ -1,7 +1,8 @@
-use vecmath::{Vec3, add, mul, neg};
+use vecmath::{Vec3, add, dot, mul, neg, length};
 use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
+use std::mem;
 
 pub trait Node: NodeClone {
     fn name(&self) -> &str;
@@ -51,7 +52,7 @@ impl Sphere {
     }
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IntersectionType {
     Entry,
     Exit
@@ -66,6 +67,7 @@ pub struct Intersection {
     rd: Vec3,
     primitive_transform: Transform,
     t: IntersectionType,
+    face: i64,  // Todo: maybe use a type instea
     wpos: Option<Vec3>,
     opos: Option<Vec3>,
     normal: Option<Vec3>
@@ -90,7 +92,8 @@ impl Intersection {
         rp: Vec3,
         rd: Vec3,
         primitive_transform: Transform,
-        t: IntersectionType
+        t: IntersectionType,
+        face: i64
     ) -> Intersection {
         Intersection {
             scale: scale,
@@ -100,6 +103,7 @@ impl Intersection {
             rd: rd,
             primitive_transform: primitive_transform,
             t: t,
+            face: face,
             wpos: None,
             opos: None,
             normal: None
@@ -280,13 +284,44 @@ impl Node for Sphere {
     fn name(&self) -> &str {
         return "sphere";
     }
-    fn intersect(&self, _raypos: Vec3, _raydir: Vec3) -> Vec<Intersection> {
-        vec![]
+
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+        let tr = &self.transform;
+        let transformed_raydir = tr.inv_transform_vector(raydir);
+        let scale = 1.0 / length(transformed_raydir);
+        let normalized_transformed_raydir = mul(transformed_raydir, scale); // normalize
+        let transformed_raypos = tr.inv_transform_point(raypos);
+        let s = dot(neg(transformed_raypos), normalized_transformed_raydir);
+        let lsq = dot(transformed_raypos, transformed_raypos);
+        if s < 0.0 && lsq > 1.0 {
+            return vec![];
+        }
+        let msq = lsq - s * s;
+        if msq > 1.0 {
+            return vec![];
+        }
+        let q = (1.0 - msq).sqrt();
+        let mut t1 = s + q;
+        let mut t2 = s - q;
+        if t1 > t2 {
+            mem::swap(&mut t1, &mut t2);
+        }
+        let mut ts = vec![];
+        if t1 > 0.0 {
+            ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, tr.clone(), IntersectionType::Entry, 0));
+        }
+        if t2 > 0.0 {
+            ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, tr.clone(), IntersectionType::Exit, 0));
+        }
+        ts
     }
-    fn inside(&self, _pos: Vec3) -> bool {
-        false
+    fn inside(&self, pos: Vec3) -> bool {
+        let transformed_pos = self.transform.inv_transform_point(pos);
+        dot(transformed_pos, transformed_pos) <= 1.0
     }
-    fn translate(&mut self, _tx: f64, _ty: f64, _tz: f64) {}
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.transform.translate(tx, ty, tz);
+    }
     fn scale(&mut self, _sx: f64, _sy: f64, _sz: f64) {}
     fn uscale(&mut self, _s: f64) {}
     fn rotatex(&mut self, _d: f64) {}
@@ -647,9 +682,21 @@ fn test_intersection() {
         [1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
         Default::default(),
-        IntersectionType::Entry);
+        IntersectionType::Entry,
+        0);
     assert!(i.distance == 6.0);
     assert!(i.t == IntersectionType::Entry);
     i.switch(IntersectionType::Exit);
     assert!(i.t == IntersectionType::Exit);
+}
+
+#[test]
+fn test_intersection_sphere() {
+    let mut obj = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
+    obj.translate(0.0, 0.0, 5.0);
+    let mut intersections = obj.intersect([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+    for i in intersections.iter_mut() {
+        let wpos = i.get_wpos();
+        println!("Intersection type: {:?}, pos: {:?}, distance: {:?}", i.t, wpos, i.distance);
+    }
 }

@@ -3,6 +3,7 @@ use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
 use std::mem;
+use std::iter;
 use std::sync::atomic::{self, AtomicUsize};
 
 static NODE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
@@ -57,12 +58,6 @@ impl Clone for Box<Node> {
     }
 }
 
-// pub struct Operator {
-//     obj1: Box<Node>,
-//     obj2: Box<Node>,
-//     rule: Fn(bool, bool) -> bool,
-// }
-
 #[derive(Clone)]
 pub struct Sphere {
     transform: Transform,
@@ -82,7 +77,7 @@ pub enum IntersectionType {
     Exit
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Intersection {
     scale: f64,
     odistance: f64,
@@ -139,129 +134,175 @@ impl Intersection {
     }
 }
 
-// class Node(object):
-//     def intersect(self, raypos, raydir):
-//         return []
+#[derive(Clone)]
+pub struct Operator {
+    obj1: Box<Node>,
+    obj2: Box<Node>,
+    rule: &'static Fn(bool, bool) -> bool,
+    name: &'static str,
+    id: NodeId
+}
 
-// class Operator(Node):
-//     def __init__(self, obj1, obj2):
-//         self.obj1 = obj1
-//         self.obj2 = obj2
+fn union(a: bool, b: bool) -> bool {
+    a || b
+}
 
-//     def translate(self, tx, ty, tz):
-//         self.obj1.translate(tx, ty, tz)
-//         self.obj2.translate(tx, ty, tz)
+fn intersect(a: bool, b: bool) -> bool {
+    a && b
+}
 
-//     def scale(self, sx, sy, sz):
-//         self.obj1.scale(sx, sy, sz)
-//         self.obj2.scale(sx, sy, sz)
+fn difference(a: bool, b: bool) -> bool {
+    a && !b
+}
 
-//     def uscale(self, s):
-//         self.obj1.uscale(s)
-//         self.obj2.uscale(s)
+impl Operator {
+    pub fn make_union(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
+        Operator {
+            obj1: obj1,
+            obj2: obj2,
+            rule: &union,
+            name: "union",
+            id: NodeId::new()
+        }
+    }
+    pub fn make_intersect(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
+        Operator {
+            obj1: obj1,
+            obj2: obj2,
+            rule: &intersect,
+            name: "intersect",
+            id: NodeId::new()
+        }
+    }
+    pub fn make_difference(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
+        Operator {
+            obj1: obj1,
+            obj2: obj2,
+            rule: &difference,
+            name: "difference",
+            id: NodeId::new()
+        }
+    }
+}
 
-//     def rotatex(self, d):
-//         self.obj1.rotatex(d)
-//         self.obj2.rotatex(d)
+impl Node for Operator {
+    fn name(&self) -> &str {
+        self.name
+    }
+    fn id(&self) -> NodeId {
+        self.id
+    }
+    fn find_node(&self, id: NodeId) -> Option<&Node> {
+        if let Some(n) = self.obj1.find_node(id) {
+            Some(n)
+        } else if let Some(n) = self.obj2.find_node(id) {
+            Some(n)
+        } else {
+            println!("couldn't find node {:?}, has {:?} {:?}", id, self.obj1.id(), self.obj2.id());
+            None
+        }
+    }
+    fn inside(&self, pos: Vec3) -> bool {
+        (self.rule)(self.obj1.inside(pos), self.obj2.inside(pos))
+    }
+    fn get_surface(&self, _opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
+        return ([0.0, 0.0, 0.0], 0.0, 0.0, 0.0);
+    }
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.obj1.translate(tx, ty, tz);
+        self.obj2.translate(tx, ty, tz);
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.obj1.scale(sx, sy, sz);
+        self.obj2.scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.obj1.uscale(s);
+        self.obj2.uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.obj1.rotatex(d);
+        self.obj2.rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.obj1.rotatey(d);
+        self.obj2.rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.obj1.rotatez(d);
+        self.obj2.rotatez(d);
+    }
 
-//     def rotatey(self, d):
-//         self.obj1.rotatey(d)
-//         self.obj2.rotatey(d)
+    fn transform_point(&self, _p: Vec3) -> Vec3 {
+        return [0.0, 0.0, 0.0];
+    }
 
-//     def rotatez(self, d):
-//         self.obj1.rotatez(d)
-//         self.obj2.rotatez(d)
+    fn get_normal(&self, _p: Vec3) -> Vec3 {
+        return [1.0, 0.0, 0.0];
+    }
 
-//     def inside(self, pos):
-//         return self.rule(self.obj1.inside(pos), self.obj2.inside(pos))
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+        let mut inside1 = 0;
+        let mut inside2 = 0;
+        if self.obj1.inside(raypos) {
+            inside1 = 1;
+        }
+        if self.obj2.inside(raypos) {
+            inside2 = 1;
+        }
+        let mut inside = (self.rule)(inside1 > 0, inside2 > 0);
+        let mut obj1i = self.obj1.intersect(raypos, raydir);
+        let mut obj2i = self.obj2.intersect(raypos, raydir);
 
-//     def intersect(self, raypos, raydir):
-//         inside1 = 0
-//         inside2 = 0
-//         if self.obj1.inside(raypos):
-//             inside1 = 1
-//         if self.obj2.inside(raypos):
-//             inside2 = 1
-//         inside = self.rule(inside1 > 0, inside2 > 0)
-//         #print inside, inside1, inside2, self.obj1, self.obj2
-//         obj1i = self.obj1.intersect(raypos, raydir)
-//         obj2i = self.obj2.intersect(raypos, raydir)
-//         intersections = sorted([(i, 1) for i in obj1i] +
-//                                [(i, 2) for i in obj2i])
-//         res = []
-//         prevt = 0.0
-//         for i, obj in intersections:
-//             if i.t == Intersection.ENTRY:
-//                 if obj == 1:
-//                     inside1 += 1
-//                 else:
-//                     inside2 += 1
-//             elif i.t == Intersection.EXIT:
-//                 if obj == 1:
-//                     inside1 -= 1
-//                 else:
-//                     inside2 -= 1
+        let mut intersections: Vec<(&mut Intersection, i32)> = obj1i.iter_mut()
+            .zip(iter::repeat(1))
+            .chain(obj2i.iter_mut()
+                   .zip(iter::repeat(2)))
+            .collect();
+        intersections.sort_by(|a, b| a.1.cmp(&b.1));
 
-//             newinside = self.rule(inside1 > 0, inside2 > 0)
-// #            print i, inside1, inside2, inside, newinside
-//             if inside and not newinside:
-//                 if (i.distance - prevt) < 1e-10:
-//                     # remove infinitesimal intersections
-//                     # to avoid problem with difference of touching surfaces
-//                     #print i, res[-1]
-//                     res.pop()
-//                 else:
-//                     i.switch(Intersection.EXIT)
-//                     res.append(i)
-//             if not inside and newinside:
-//                 i.switch(Intersection.ENTRY)
-//                 res.append(i)
-//                 prevt = i.distance
-//             inside = newinside
+        let mut res = Vec::<Intersection>::new();
+        let mut prevt = 0.0;
+        for (ref mut i, obj) in intersections.iter_mut() {
+            match i.t {
+                IntersectionType::Entry => {
+                    if *obj == 1 {
+                        inside1 = inside1 + 1;
+                    } else {
+                        inside2 = inside2 + 1;
+                    }
+                },
+                IntersectionType::Exit => {
+                    if *obj == 1 {
+                        inside1 = inside1 - 1;
+                    } else {
+                        inside2 = inside2 - 1;
+                    }
+                }
+            }
 
-// #        for r in res:
-// #            print "r", r
-//         return res
+            let newinside = (self.rule)(inside1 > 0, inside2 > 0);
+            if inside && !newinside {
+                if (i.distance - prevt) < 1e-10 {
+                    // remove infinitesimal intersections
+                    // to avoid problem with difference of touching surfaces
+                    res.pop();
+                } else {
+                    i.switch(IntersectionType::Exit);
+                    res.push(**i);
+                }
+            }
+            if !inside && newinside {
+                i.switch(IntersectionType::Entry);
+                prevt = i.distance;
+                res.push(**i);
+                inside = newinside;
+            }
+        }
 
-// class Union(Operator):
-//     def rule(self, a, b):
-//         return a or b
-
-// class Intersect(Operator):
-//     def rule(self, a, b):
-//         return a and b
-
-// class Difference(Operator):
-//     def rule(self, a, b):
-//         return a and not b
-
-// class Primitive(Node):
-//     def __init__(self, surface):
-//         self.surface = surface
-//         self.transform = Transform()
-
-//     def translate(self, tx, ty, tz):
-//         self.transform.translate(tx, ty, tz)
-
-//     def scale(self, sx, sy, sz):
-//         self.transform.scale(sx, sy, sz)
-
-//     def uscale(self, s):
-//         self.transform.isoscale(s)
-
-//     def rotatex(self, d):
-//         self.transform.rotatex(d)
-
-//     def rotatey(self, d):
-//         self.transform.rotatey(d)
-
-//     def rotatez(self, d):
-//         self.transform.rotatez(d)
-
-//     def get_surface(self, i):
-//         def yellow(face, u, v):
-//             return (0.1, 1.0, 1.0), 0.4, 0.05, 4
-//         return yellow
+        res
+    }
+}
 
 // def atan2(a, b):
 //     c = 0.5 * math.atan2(a, b) / math.pi
@@ -329,11 +370,21 @@ impl Node for Sphere {
     fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
         self.transform.translate(tx, ty, tz);
     }
-    fn scale(&mut self, _sx: f64, _sy: f64, _sz: f64) {}
-    fn uscale(&mut self, _s: f64) {}
-    fn rotatex(&mut self, _d: f64) {}
-    fn rotatey(&mut self, _d: f64) {}
-    fn rotatez(&mut self, _d: f64) {}
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.transform.scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.transform.uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.transform.rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.transform.rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.transform.rotatez(d);
+    }
 
     fn transform_point(&self, p: Vec3) -> Vec3 {
         self.transform.transform_point(p)
@@ -343,44 +394,6 @@ impl Node for Sphere {
         normalize(self.transform.transform_normal(p))
     }
 }
-// class Sphere(Primitive):
-//     def intersect(self, raypos, raydir):
-//         tr = self.transform
-//         raydir = tr.inv_transform_vector(raydir)
-//         scale = 1.0 / length(raydir)
-//         raydir = mul(raydir, scale) # normalize
-//         raypos = tr.inv_transform_point(raypos)
-//         s = dot(neg(raypos), raydir)
-//         lsq = dot(raypos, raypos)
-//         if s < 0.0 and lsq > 1.0:
-//             return []
-//         msq = lsq - s * s
-//         if msq > 1.0:
-//             return []
-//         q = math.sqrt(1.0 - msq)
-//         t1 = s + q
-//         t2 = s - q
-//         if t1 > t2:
-//             t1, t2 = t2, t1
-//         ts = []
-//         if t1 > 0.0:
-//             ts.append(Intersection(scale, t1, raypos, raydir, self, Intersection.ENTRY, 0))
-//         if t2 > 0.0:
-//             ts.append(Intersection(scale, t2, raypos, raydir, self, Intersection.EXIT, 0))
-//         return ts
-
-//     def inside(self, pos):
-//         x, y, z = self.transform.inv_transform_point(pos)
-//         return (x * x + y * y + z * z) <= 1.0
-
-//     def get_surface(self, i):
-//         x, y, z = i.opos
-//         v = (y + 1.0) / 2.0
-//         u = atan2(x, z)
-//         return self.surface(i.face, u, v)
-
-//     def get_normal(self, i):
-//         return normalize(self.transform.transform_normal(i.opos))
 
 // class Cube(Primitive):
 //     normals = [(0.0, 0.0, -1.0),

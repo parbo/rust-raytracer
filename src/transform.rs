@@ -48,7 +48,7 @@ impl Transform {
         self.inv_m = mmmul(self.inv_m, inv_sc);
     }
 
-    pub fn isoscale(&mut self, s: f64) {
+    pub fn uscale(&mut self, s: f64) {
         self.scale(s, s, s);
     }
 
@@ -65,48 +65,50 @@ impl Transform {
         self.inv_m = mmmul(self.inv_m, inv_tr);
     }
 
-    // def rotatex(self, d):
-    //     cosd = math.cos(math.radians(d))
-    //     sind = math.sin(math.radians(d))
-    //     rx = ((1.0, 0.0, 0.0, 0.0),
-    //           (0.0, cosd, -sind, 0.0),
-    //           (0.0, sind, cosd, 0.0),
-    //           (0.0, 0.0, 0.0, 1.0))
-    //     inv_rx = ((1.0, 0.0, 0.0, 0.0),
-    //               (0.0, cosd, sind, 0.0),
-    //               (0.0, -sind, cosd, 0.0),
-    //               (0.0, 0.0, 0.0, 1.0))
-    //     self.m = mmmul(rx, self.m)
-    //     self.inv_m = mmmul(self.inv_m, inv_rx)
+    pub fn rotatex(&mut self, d: f64) {
+        let cosd = d.to_radians().cos();
+        let sind = d.to_radians().sin();
+        let rx = [[1.0, 0.0, 0.0, 0.0],
+                  [0.0, cosd, -sind, 0.0],
+                  [0.0, sind, cosd, 0.0],
+                  [0.0, 0.0, 0.0, 1.0]];
+        let inv_rx = [[1.0, 0.0, 0.0, 0.0],
+                      [0.0, cosd, sind, 0.0],
+                      [0.0, -sind, cosd, 0.0],
+                      [0.0, 0.0, 0.0, 1.0]];
+        self.m = mmmul(rx, self.m);
+        self.inv_m = mmmul(self.inv_m, inv_rx);
+    }
 
-    // def rotatey(self, d):
-    //     cosd = math.cos(math.radians(d))
-    //     sind = math.sin(math.radians(d))
-    //     ry = ((cosd, 0.0, sind, 0.0),
-    //           (0.0, 1.0, 0.0, 0.0),
-    //           (-sind, 0.0, cosd, 0.0),
-    //           (0.0, 0.0, 0.0, 1.0))
-    //     inv_ry = ((cosd, 0.0, -sind, 0.0),
-    //               (0.0, 1.0, 0.0, 0.0),
-    //               (sind, 0.0, cosd, 0.0),
-    //               (0.0, 0.0, 0.0, 1.0))
-    //     self.m = mmmul(ry, self.m)
-    //     self.inv_m = mmmul(self.inv_m, inv_ry)
-    
-    // def rotatez(self, d):
-    //     cosd = math.cos(math.radians(d))
-    //     sind = math.sin(math.radians(d))
-    //     rz = ((cosd, -sind, 0.0, 0.0),
-    //           (sind, cosd, 0.0, 0.0),
-    //           (0.0, 0.0, 1.0, 0.0),
-    //           (0.0, 0.0, 0.0, 1.0))
-    //     inv_rz = ((cosd, sind, 0.0, 0.0),
-    //               (-sind, cosd, 0.0, 0.0),
-    //               (0.0, 0.0, 1.0, 0.0),
-    //               (0.0, 0.0, 0.0, 1.0))
-    //     self.m = mmmul(rz, self.m)
-    //     self.inv_m = mmmul(self.inv_m, inv_rz)
+    pub fn rotatey(&mut self, d: f64) {
+        let cosd = d.to_radians().cos();
+        let sind = d.to_radians().sin();
+        let ry = [[cosd, 0.0, sind, 0.0],
+                  [0.0, 1.0, 0.0, 0.0],
+                  [-sind, 0.0, cosd, 0.0],
+                  [0.0, 0.0, 0.0, 1.0]];
+        let inv_ry = [[cosd, 0.0, -sind, 0.0],
+                      [0.0, 1.0, 0.0, 0.0],
+                      [sind, 0.0, cosd, 0.0],
+                      [0.0, 0.0, 0.0, 1.0]];
+        self.m = mmmul(ry, self.m);
+        self.inv_m = mmmul(self.inv_m, inv_ry);
+    }
 
+    pub fn rotatez(&mut self, d: f64) {
+        let cosd = d.to_radians().cos();
+        let sind = d.to_radians().sin();
+        let rz = [[cosd, -sind, 0.0, 0.0],
+                  [sind, cosd, 0.0, 0.0],
+                  [0.0, 0.0, 1.0, 0.0],
+                  [0.0, 0.0, 0.0, 1.0]];
+        let inv_rz = [[cosd, sind, 0.0, 0.0],
+                      [-sind, cosd, 0.0, 0.0],
+                      [0.0, 0.0, 1.0, 0.0],
+                      [0.0, 0.0, 0.0, 1.0]];
+        self.m = mmmul(rz, self.m);
+        self.inv_m = mmmul(self.inv_m, inv_rz);
+    }
 }
 
 impl Default for Transform {

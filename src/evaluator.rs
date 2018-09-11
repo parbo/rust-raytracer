@@ -127,6 +127,14 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpSubi => eval_subi(stack),
         &tokenizer::Ops::OpSubf => eval_subf(stack),
         &tokenizer::Ops::OpTranslate => eval_translate(stack),
+        &tokenizer::Ops::OpScale => eval_scale(stack),
+        &tokenizer::Ops::OpUscale => eval_uscale(stack),
+        &tokenizer::Ops::OpRotatex => eval_rotatex(stack),
+        &tokenizer::Ops::OpRotatey => eval_rotatey(stack),
+        &tokenizer::Ops::OpRotatez => eval_rotatez(stack),
+        &tokenizer::Ops::OpUnion => eval_union(stack),
+        &tokenizer::Ops::OpIntersect => eval_intersect(stack),
+        &tokenizer::Ops::OpDifference => eval_difference(stack),
         op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
@@ -481,6 +489,27 @@ fn eval_sphere(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
+fn eval_union(stack: &mut Stack) -> Result<(), EvalError> {
+    let obj1 = pop(stack)?;
+    let obj2 = pop(stack)?;
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_union(move_node(obj1), move_node(obj2)))));
+    Ok(())
+}
+
+fn eval_intersect(stack: &mut Stack) -> Result<(), EvalError> {
+    let obj1 = pop(stack)?;
+    let obj2 = pop(stack)?;
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_intersect(move_node(obj1), move_node(obj2)))));
+    Ok(())
+}
+
+fn eval_difference(stack: &mut Stack) -> Result<(), EvalError> {
+    let obj1 = pop(stack)?;
+    let obj2 = pop(stack)?;
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_difference(move_node(obj1), move_node(obj2)))));
+    Ok(())
+}
+
 // def eval_cube(env, stack):
 //     surface, stack = pop(stack)
 //     return env, push(stack, primitives.Cube(get_surface(surface)))
@@ -526,45 +555,73 @@ fn eval_translate(stack: &mut Stack) -> Result<(), EvalError> {
         other => Err(EvalError::WrongType(other))
     }
 }
-// def eval_translate(env, stack):
-//     tz, stack = pop(stack)
-//     ty, stack = pop(stack)
-//     tx, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     obj.translate(get_real(tx), get_real(ty), get_real(tz))
-//     return env, push(stack, obj)
 
-// def eval_scale(env, stack):
-//     sz, stack = pop(stack)
-//     sy, stack = pop(stack)
-//     sx, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     obj.scale(get_real(sx), get_real(sy), get_real(sz))
-//     return env, push(stack, obj)
+fn eval_scale(stack: &mut Stack) -> Result<(), EvalError> {
+    let sz = pop(stack)?;
+    let sy = pop(stack)?;
+    let sx = pop(stack)?;
+    let obj = pop(stack)?;
+    match obj {
+        Value::ValNode(mut node) => {
+            node.scale(get_real(&sx), get_real(&sy), get_real(&sz));
+            stack.push(Value::ValNode(node));
+            Ok(())
+        },
+        other => Err(EvalError::WrongType(other))
+    }
+}
 
-// def eval_uscale(env, stack):
-//     s, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     obj.uscale(get_real(s))
-//     return env, push(stack, obj)
+fn eval_uscale(stack: &mut Stack) -> Result<(), EvalError> {
+    let s = pop(stack)?;
+    let obj = pop(stack)?;
+    match obj {
+        Value::ValNode(mut node) => {
+            node.uscale(get_real(&s));
+            stack.push(Value::ValNode(node));
+            Ok(())
+        },
+        other => Err(EvalError::WrongType(other))
+    }
+}
 
-// def eval_rotatex(env, stack):
-//     d, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     obj.rotatex(get_real(d))
-//     return env, push(stack, obj)
+fn eval_rotatex(stack: &mut Stack) -> Result<(), EvalError> {
+    let d = pop(stack)?;
+    let obj = pop(stack)?;
+    match obj {
+        Value::ValNode(mut node) => {
+            node.rotatex(get_real(&d));
+            stack.push(Value::ValNode(node));
+            Ok(())
+        },
+        other => Err(EvalError::WrongType(other))
+    }
+}
 
-// def eval_rotatey(env, stack):
-//     d, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     obj.rotatey(get_real(d))
-//     return env, push(stack, obj)
+fn eval_rotatey(stack: &mut Stack) -> Result<(), EvalError> {
+    let d = pop(stack)?;
+    let obj = pop(stack)?;
+    match obj {
+        Value::ValNode(mut node) => {
+            node.rotatey(get_real(&d));
+            stack.push(Value::ValNode(node));
+            Ok(())
+        },
+        other => Err(EvalError::WrongType(other))
+    }
+}
 
-// def eval_rotatez(env, stack):
-//     d, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     obj.rotatez(get_real(d))
-//     return env, push(stack, obj)
+fn eval_rotatez(stack: &mut Stack) -> Result<(), EvalError> {
+    let d = pop(stack)?;
+    let obj = pop(stack)?;
+    match obj {
+        Value::ValNode(mut node) => {
+            node.rotatez(get_real(&d));
+            stack.push(Value::ValNode(node));
+            Ok(())
+        },
+        other => Err(EvalError::WrongType(other))
+    }
+}
 
 fn eval_light(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;

@@ -135,6 +135,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpUnion => eval_union(stack),
         &tokenizer::Ops::OpIntersect => eval_intersect(stack),
         &tokenizer::Ops::OpDifference => eval_difference(stack),
+        &tokenizer::Ops::OpPlane => eval_plane(stack),
         op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
@@ -522,24 +523,11 @@ fn eval_difference(stack: &mut Stack) -> Result<(), EvalError> {
 //     surface, stack = pop(stack)
 //     return env, push(stack, primitives.Cone(get_surface(surface)))
 
-// def eval_plane(env, stack):
-//     surface, stack = pop(stack)
-//     return env, push(stack, primitives.Plane(get_surface(surface)))
-
-// def eval_union(env, stack):
-//     obj2, stack = pop(stack)
-//     obj1, stack = pop(stack)
-//     return env, push(stack, primitives.Union(obj1, obj2))
-
-// def eval_intersect(env, stack):
-//     obj2, stack = pop(stack)
-//     obj1, stack = pop(stack)
-//     return env, push(stack, primitives.Intersect(obj1, obj2))
-
-// def eval_difference(env, stack):
-//     obj2, stack = pop(stack)
-//     obj1, stack = pop(stack)
-//     return env, push(stack, primitives.Difference(obj1, obj2))
+fn eval_plane(stack: &mut Stack) -> Result<(), EvalError> {
+    let surface = pop(stack)?;
+    stack.push(Value::ValNode(Box::new(primitives::Plane::new(move_surface(surface)))));
+    Ok(())
+}
 
 fn eval_translate(stack: &mut Stack) -> Result<(), EvalError> {
     let tz = pop(stack)?;

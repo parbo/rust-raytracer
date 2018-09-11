@@ -58,19 +58,6 @@ impl Clone for Box<Node> {
     }
 }
 
-#[derive(Clone)]
-pub struct Sphere {
-    transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
-}
-
-impl Sphere {
-    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
-        Sphere { transform: Default::default(), surface: surface, id: NodeId::new() }
-    }
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IntersectionType {
     Entry,
@@ -198,7 +185,6 @@ impl Node for Operator {
         } else if let Some(n) = self.obj2.find_node(id) {
             Some(n)
         } else {
-            println!("couldn't find node {:?}, has {:?} {:?}", id, self.obj1.id(), self.obj2.id());
             None
         }
     }
@@ -206,6 +192,7 @@ impl Node for Operator {
         (self.rule)(self.obj1.inside(pos), self.obj2.inside(pos))
     }
     fn get_surface(&self, _opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
+        panic!("this should not happen");
         return ([0.0, 0.0, 0.0], 0.0, 0.0, 0.0);
     }
     fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
@@ -234,10 +221,12 @@ impl Node for Operator {
     }
 
     fn transform_point(&self, _p: Vec3) -> Vec3 {
+        panic!("this should not happen");
         return [0.0, 0.0, 0.0];
     }
 
     fn get_normal(&self, _p: Vec3) -> Vec3 {
+        panic!("this should not happen");
         return [1.0, 0.0, 0.0];
     }
 
@@ -259,7 +248,7 @@ impl Node for Operator {
             .chain(obj2i.iter_mut()
                    .zip(iter::repeat(2)))
             .collect();
-        intersections.sort_by(|a, b| a.1.cmp(&b.1));
+        intersections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
         let mut res = Vec::<Intersection>::new();
         let mut prevt = 0.0;
@@ -304,11 +293,18 @@ impl Node for Operator {
     }
 }
 
-// def atan2(a, b):
-//     c = 0.5 * math.atan2(a, b) / math.pi
-//     while c < 0.0:
-//         c += 1.0
-//     return c
+#[derive(Clone)]
+pub struct Sphere {
+    transform: Transform,
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    id: NodeId
+}
+
+impl Sphere {
+    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
+        Sphere { transform: Default::default(), surface: surface, id: NodeId::new() }
+    }
+}
 
 impl Node for Sphere {
     fn name(&self) -> &str {
@@ -672,35 +668,94 @@ impl Node for Sphere {
 //         return normalize(self.transform.transform_normal(n))
 
 
-// class Plane(Primitive):
-//     np = (0.0, 1.0, 0.0)
-//     def intersect(self, raypos, raydir):
-//         tr = self.transform
-//         raydir = tr.inv_transform_vector(raydir)
-//         scale = 1.0 / length(raydir)
-//         raydir = mul(raydir, scale) # normalize
-//         raypos = tr.inv_transform_point(raypos)
-//         np = self.np
-//         denom = dot(np, raydir)
-//         if abs(denom) < 1e-7:
-//             return []
-//         t = -dot(np, raypos) / denom
-//         if t < 0.0:
-//             return []
-//         if denom > 0.0:
-//             return [Intersection(scale, t, raypos, raydir, self, Intersection.EXIT, 0)]
-//         else:
-//             return [Intersection(scale, t, raypos, raydir, self, Intersection.ENTRY, 0)]
+#[derive(Clone)]
+pub struct Plane {
+    transform: Transform,
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    id: NodeId
+}
 
-//     def inside(self, pos):
-//         return self.transform.inv_transform_py(pos) <= 0.0
+impl Plane {
+    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Self {
+        Plane { transform: Default::default(), surface: surface, id: NodeId::new() }
+    }
+}
 
-//     def get_surface(self, i):
-//         x, y, z = i.opos
-//         return self.surface(0, x, z)
+impl Node for Plane {
+    fn name(&self) -> &str {
+        return "plane";
+    }
 
-//     def get_normal(self, i):
-//         return normalize(self.transform.transform_normal(self.np))
+    fn id(&self) -> NodeId {
+        self.id
+    }
+
+    fn find_node(&self, id: NodeId) -> Option<&Node> {
+        if id == self.id {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+        let np = [0.0, 1.0, 0.0];
+        let tr = &self.transform;
+        let transformed_raydir = tr.inv_transform_vector(raydir);
+        let scale = 1.0 / length(transformed_raydir);
+        let normalized_transformed_raydir = mul(transformed_raydir, scale);
+        let transformed_raypos = tr.inv_transform_point(raypos);
+        let denom = dot(np, normalized_transformed_raydir);
+        if denom.abs() < 1e-7 {
+            return vec![];
+        }
+        let t = -dot(np, transformed_raypos) / denom;
+        if t < 0.0 {
+            return vec![];
+        }
+        if denom > 0.0 {
+            return vec![Intersection::new(scale, t, transformed_raypos, normalized_transformed_raydir, self.id, IntersectionType::Exit, 0)];
+        } else {
+            return vec![Intersection::new(scale, t, transformed_raypos, normalized_transformed_raydir, self.id, IntersectionType::Entry, 0)];
+        }
+    }
+
+    fn inside(&self, pos: Vec3) -> bool {
+        self.transform.inv_transform_py(pos) <= 0.0
+    }
+
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.transform.translate(tx, ty, tz);
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.transform.scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.transform.uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.transform.rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.transform.rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.transform.rotatez(d);
+    }
+
+    fn transform_point(&self, p: Vec3) -> Vec3 {
+        self.transform.transform_point(p)
+    }
+
+    fn get_surface(&self, opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
+        let [x, _y, z] = opos;
+        (self.surface)(0, x, z)
+    }
+
+    fn get_normal(&self, _p: Vec3) -> Vec3 {
+        normalize(self.transform.transform_normal([0.0, 1.0, 0.0]))
+    }
+}
 
 #[test]
 fn test_intersection() {

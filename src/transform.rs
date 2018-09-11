@@ -1,4 +1,4 @@
-use vecmath::{Mat4, identity, Vec3, transform, mmmul, transpose};
+use vecmath::{Mat4, identity, Vec3, transform, mmmul, mvmuly, transpose};
 
 #[derive(Clone)]
 pub struct Transform {
@@ -34,6 +34,12 @@ impl Transform {
     pub fn transform_normal(&self, v: Vec3) -> Vec3 {
         transform_vector(transpose(self.inv_m), v)
     }
+
+    pub fn inv_transform_py(&self, v: Vec3) -> f64 {
+        let [x, y, z] = v;
+        mvmuly(self.inv_m, [x, y, z, 1.0])
+    }
+
 
     pub fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
         let sc = [[sx, 0.0, 0.0, 0.0],

@@ -136,6 +136,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpIntersect => eval_intersect(stack),
         &tokenizer::Ops::OpDifference => eval_difference(stack),
         &tokenizer::Ops::OpPlane => eval_plane(stack),
+        &tokenizer::Ops::OpPointlight => eval_pointlight(stack),
         op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
@@ -619,11 +620,13 @@ fn eval_light(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
-// def eval_pointlight(env, stack):
-//     color, stack = pop(stack)
-//     pos, stack = pop(stack)
-//     return env, push(stack, lights.PointLight(get_point(pos),
-//                                               get_point(color)))
+fn eval_pointlight(stack: &mut Stack) -> Result<(), EvalError> {
+    let color = pop(stack)?;
+    let p = pop(stack)?;
+    stack.push(Value::ValLight(Box::new(lights::PointLight::new(move_point(p),
+                                                                move_point(color)))));
+    Ok(())
+}
 
 // def eval_spotlight(env, stack):
 //     exp, stack = pop(stack)

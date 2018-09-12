@@ -50,7 +50,6 @@ fn main() {
     let mut defines = HashSet::<String>::new();
     if let Ok(lines) = get_contents(Path::new(filename), &mut defines) {
         let contents = lines.join("\n");
-        println!("{}", contents);
         evaluator::run(&contents);
     }
 }

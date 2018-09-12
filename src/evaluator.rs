@@ -640,25 +640,6 @@ fn eval_pointlight(stack: &mut Stack) -> Result<(), EvalError> {
 //                                              get_real(cutoff),
 //                                              get_real(exp)))
 
-// def eval_render(env, stack):
-//     file, stack = pop(stack)
-//     ht, stack = pop(stack)
-//     wid, stack = pop(stack)
-//     fov, stack = pop(stack)
-//     depth, stack = pop(stack)
-//     obj, stack = pop(stack)
-//     lights, stack = pop(stack)
-//     amb, stack = pop(stack)
-//     raytracer.render(get_point(amb),
-//                      get_array(lights),
-//                      get_node(obj),
-//                      get_integer(depth),
-//                      get_real(fov),
-//                      get_integer(wid),
-//                      get_integer(ht),
-//                      get_string(file))
-//     return env, stack
-
 fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     let file = pop(stack)?;
     let ht = pop(stack)?;

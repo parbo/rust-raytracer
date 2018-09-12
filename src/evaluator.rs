@@ -1,7 +1,11 @@
 use std::collections;
 use std::error::Error as StdError;
 use std::fmt;
+use std::fmt::Debug;
 use std::rc::Rc;
+use std::hash::Hash;
+use std::borrow::Borrow;
+use std::clone::Clone;
 use parser;
 use primitives;
 use tokenizer;
@@ -57,7 +61,56 @@ impl PartialEq for Value {
     }
 }
 
-pub type Env = collections::HashMap<String, Value>;
+#[derive(Clone)]
+pub struct SnapMap<K, V> {
+    snapshot: Rc<Box<collections::HashMap<K, V>>>,
+    current: collections::HashMap<K, V>
+}
+
+impl<K, V> PartialEq for SnapMap<K, V> where
+    K: Eq + Hash,
+    V: PartialEq {
+    fn eq(&self, other: &SnapMap<K, V>) -> bool {
+        *self.snapshot == *other.snapshot &&
+            self.current == other.current
+    }
+}
+
+impl<K: Hash + Eq, V> SnapMap<K, V> {
+    pub fn new() -> SnapMap<K, V> {
+        SnapMap {
+            snapshot: Rc::new(Box::new(collections::HashMap::<K, V>::new())),
+            current: collections::HashMap::<K, V>::new()
+        }
+    }
+
+    pub fn snapshot(&self) -> SnapMap<K, V> where K: Clone + Debug, V: Clone + Debug {
+        let mut snapshot = self.current.clone();
+        for (k, v) in self.snapshot.iter() {
+            snapshot.insert(k.clone(), v.clone());
+        }
+        SnapMap {
+            snapshot: Rc::new(Box::new(snapshot)),
+            current: collections::HashMap::<K, V>::new()
+        }
+    }
+
+    pub fn get<Q: ?Sized>(&self, k: &Q) -> Option<&V>
+    where K: Borrow<Q> + Debug, Q: Hash + Eq + Debug, V: Debug {
+        if let Some(v) = self.current.get(k) {
+            return Some(v);
+        } else if let Some(v) = self.snapshot.get(k) {
+            return Some(v);
+        }
+        None
+    }
+
+    pub fn insert(&mut self, k: K, v: V) {
+        self.current.insert(k, v);
+    }
+}
+
+pub type Env = SnapMap<String, Value>;
 pub type Stack = Vec<Value>;
 
 fn pop(stack: &mut Stack) -> Result<Value, EvalError> {
@@ -686,7 +739,7 @@ fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
     for i in 0..ast.len() {
         match &ast[i] {
             &parser::AstNode::Function(ref v) => {
-                stack.push(Value::ValClosure(env.clone(), v.clone()));
+                stack.push(Value::ValClosure(env.snapshot(), v.clone()));
             }
             &parser::AstNode::Array(ref v) => {
                 let mut local_stack = Stack::new();
@@ -722,8 +775,7 @@ fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
 }
 
 fn evaluate(ast: &[parser::AstNode]) -> (Env, Stack) {
-    // Apparently can't call static methods on aliased types, so her goes the full name of Env
-    let mut env: collections::HashMap<String, Value> = collections::HashMap::<String, Value>::new();
+    let mut env: SnapMap<String, Value> = SnapMap::<String, Value>::new();
     let mut stack = Stack::new();
     stack.reserve(100); // Let's avoid too many allocations
     do_evaluate(&mut env, &mut stack, &ast);

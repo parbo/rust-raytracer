@@ -55,6 +55,7 @@ pub enum Ops {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token {
     Whitespace,
+    BlockComment,
     Comment,
     BeginFunction,
     EndFunction,
@@ -101,6 +102,21 @@ fn comment_tokenizer(a: &str) -> Option<Result> {
     match consumed {
         0 => None,
         _ => Some(Result(Token::Comment, consumed, false)),
+    }
+}
+
+fn block_comment_tokenizer(a: &str) -> Option<Result> {
+    let mut consumed = 0;
+    if a.starts_with("/*") {
+        consumed = consumed + 2;
+        while !a[consumed..].starts_with("*/") {
+            consumed = consumed + 1;
+        }
+        consumed = consumed + 2;
+    }
+    match consumed {
+        0 => None,
+        _ => Some(Result(Token::BlockComment, consumed, false)),
     }
 }
 
@@ -422,7 +438,8 @@ fn string_tokenizer(a: &str) -> Option<Result> {
 }
 
 pub fn tokenize(text: &str) -> Vec<Token> {
-    let tokenizers: [fn(&str) -> Option<Result>; 13] = [whitespace_tokenizer,
+    let tokenizers: [fn(&str) -> Option<Result>; 14] = [whitespace_tokenizer,
+                                                        block_comment_tokenizer,
                                                         comment_tokenizer,
                                                         begin_function_tokenizer,
                                                         end_function_tokenizer,

@@ -109,6 +109,7 @@ pub fn render(amb: Vec3,
               w: i64,
               h: i64,
               filename: &str) {
+    println!("render to filename: {:?}", filename);
     let mut pixels = Vec::new();
     let raypos = [0.0, 0.0, -1.0];
     let w_world = 2.0 * (0.5 * fov.to_radians()).tan();

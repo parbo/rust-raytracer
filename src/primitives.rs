@@ -520,124 +520,191 @@ impl Node for Cube {
     }
 }
 
-    // class Cylinder(Primitive):
-//     def _solveCyl(self, px, pz, dx, dz):
-//         # solve x ^ 2 + z ^ 2 = 1
-//         # (px + t * dx) ^ 2 + (pz + t * dz) ^ 2 = 1
-//         # a * t ^ 2 + b * t + c = 0
-//         # t = (-b +/- sqrt(b ^ 2 - 4 * a * c)) / 2 * a
-//         a = dx * dx + dz * dz
-//         b = 2 * (px * dx + pz * dz)
-//         c = px * px + pz * pz - 1.0
-//         sq = b * b - 4 * a * c
-//         if sq < 0.0:
-//             return None
-//         else:
-//             root = math.sqrt(sq)
-//             t1 = ((-b - root) / (2.0 * a), 0)
-//             t2 = ((-b + root) / (2.0 * a), 0)
-//             if t1 > t2:
-//                 t1, t2 = t2, t1
-//             return t1, t2
+#[derive(Clone)]
+pub struct Cylinder {
+    transform: Transform,
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    id: NodeId
+}
 
-//     def _solvePlane(self, py, dy):
-//         dinv = 1.0 / dy
-//         t1 = -py * dinv
-//         t2 = (-py + 1.0) * dinv
-//         face1 = 2 # bottom
-//         face2 = 1 # top
-//         tt1 = (t1, face1)
-//         tt2 = (t2, face2)
-//         if t1 > t2:
-//             tt1, tt2 = tt2, tt1
-//         return tt1, tt2
+impl Cylinder {
+    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cylinder {
+        Cylinder { transform: Default::default(), surface: surface, id: NodeId::new() }
+    }
 
-//     def intersect(self, raypos, raydir):
-//         tr = self.transform
-//         raydir = tr.inv_transform_vector(raydir)
-//         scale = 1.0 / length(raydir)
-//         raydir = mul(raydir, scale) # normalize
-//         raypos = tr.inv_transform_point(raypos)
-//         eps = 1e-7
+    fn solve_cyl(&self, px: f64, pz: f64, dx: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
+        // solve x ^ 2 + z ^ 2 = 1
+        // (px + t * dx) ^ 2 + (pz + t * dz) ^ 2 = 1
+        // a * t ^ 2 + b * t + c = 0
+        // t = (-b +/- sqrt(b ^ 2 - 4 * a * c)) / 2 * a
+        let a = dx * dx + dz * dz;
+        let b = 2.0 * (px * dx + pz * dz);
+        let c = px * px + pz * pz - 1.0;
+        let sq = b * b - 4.0 * a * c;
+        if sq < 0.0 {
+            None
+        } else {
+            let root = sq.sqrt();
+            let mut t1 = ((-b - root) / (2.0 * a), 0);
+            let mut t2 = ((-b + root) / (2.0 * a), 0);
+            if t1 > t2 {
+                mem::swap(&mut t1, &mut t2);
+            }
+            Some((t1, t2))
+        }
+    }
 
-//         px, py, pz = raypos
-//         dx, dy, dz = raydir
-//         ts = []
-//         if abs(dy) + eps >= 1.0:
-//             # ray is parallel to the cylinder axis
-//             frsd = 1.0 - px * px - pz * pz
-//             if frsd < 0.0:
-//                 # outside cylinder
-//                 return []
-//             ts = list(self._solvePlane(py, dy))
-//         elif abs(dy) < eps:
-//             # ray is orthogonal to the cylinder axis
-//             # check planes
-//             if py < 0.0 or py > 1.0:
-//                 return []
-//             # check cylinder
-//             res = self._solveCyl(px, pz, dx, dz)
-//             if not res:
-//                 return []
-//             ts = list(res)
-//         else:
-//             # general case
-//             # check cylinder
-//             res = self._solveCyl(px, pz, dx, dz)
-//             if not res:
-//                 #print "baz"
-//                 return []
-//             tc1, tc2  = res
-//             # check planes
-//             tp1, tp2 = self._solvePlane(py, dy)
-//             # same min-max strategy as for cubes
-//             # Check max of mins
-//             tmin = tp1
-//             tmax = tp2
-//             if tc1 > tmin:
-//                 tmin = tc1
-//             if tc2 < tmax:
-//                 tmax = tc2
-//             if tmin[0] > tmax[0]:
-//                 return []
-//             if tmax[0] < 0.0:
-//                 return []
-//             ts = [tmin, tmax]
+    fn solve_plane(&self, py: f64, dy: f64) -> ((f64, i64), (f64, i64)) {
+        let dinv = 1.0 / dy;
+        let t1 = -py * dinv;
+        let t2 = (-py + 1.0) * dinv;
+        let face1 = 2i64; // bottom
+        let face2 = 1i64; // top
+        let mut tt1 = (t1, face1);
+        let mut tt2 = (t2, face2);
+        if t1 > t2 {
+            mem::swap(&mut tt1, &mut tt2);
+        }
+        (tt1, tt2)
+    }
+}
 
-//         tmin, tmax = ts
-//         ts = []
-//         if tmin[0] > 0.0:
-//             ts.append(Intersection(scale, tmin[0], raypos, raydir, self, Intersection.ENTRY, tmin[1]))
-//         if tmax[0] > 0.0:
-//             ts.append(Intersection(scale, tmax[0], raypos, raydir, self, Intersection.EXIT, tmax[1]))
-//         return ts
+impl Node for Cylinder {
+    fn name(&self) -> &str {
+        return "cylinder";
+    }
 
-//     def inside(self, pos):
-//         x, y, z = self.transform.inv_transform_point(pos)
-//         return (x * x + z * z) <= 1.0 and 0.0 <= y <= 1.0
+    fn id(&self) -> NodeId {
+        self.id
+    }
 
-//     def get_surface(self, i):
-//         x, y, z = i.opos
-//         face = i.face
-//         if face == 0:
-//             return self.surface(0, atan2(x, z), y)
-//         elif face == 1:
-//             return self.surface(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0)
-//         elif face == 2:
-//             return self.surface(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0)
-//         else:
-//             print face
-//             raise
+    fn find_node(&self, id: NodeId) -> Option<&Node> {
+        if id == self.id {
+            Some(self)
+        } else {
+            None
+        }
+    }
 
-//     def get_normal(self, i):
-//         if i.face == 0:
-//             n = (i.opos[0], 0.0, i.opos[2])
-//         elif i.face == 1:
-//             n = (0.0, 1.0, 0.0)
-//         elif i.face == 2:
-//             n =(0.0, -1.0, 0.0)
-//         return normalize(self.transform.transform_normal(n))
 
+    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+        let tr = &self.transform;
+        let mut raydir = tr.inv_transform_vector(in_raydir);
+        let scale = 1.0 / length(raydir);
+        raydir = mul(raydir, scale); // normalize
+        let raypos = tr.inv_transform_point(in_raypos);
+        let eps = 1e-7;
+
+        let [px, py, pz] = raypos;
+        let [dx, dy, dz] = raydir;
+        let mut ts = ((0.0, 0), (0.0, 0));
+        if dy.abs() + eps >= 1.0 {
+            // ray is parallel to the cylinder axis
+            let frsd = 1.0 - px * px - pz * pz;
+            if frsd < 0.0 {
+                // outside cylinder
+                return vec![];
+            }
+            ts = self.solve_plane(py, dy);
+        } else if dy.abs() < eps {
+            // ray is orthogonal to the cylinder axis
+            // check planes
+            if py < 0.0 || py > 1.0 {
+                return vec![];
+            }
+            // check cylinder
+            if let Some(res) = self.solve_cyl(px, pz, dx, dz) {
+                ts = res;
+            } else {
+                return vec![];
+            }
+        } else {
+            // general case
+            // check cylinder
+            if let Some((tc1, tc2)) = self.solve_cyl(px, pz, dx, dz) {
+                // check planes
+                let (tp1, tp2) = self.solve_plane(py, dy);
+                // same min-max strategy as for cubes
+                // Check max of mins
+                let mut tmin = tp1;
+                let mut tmax = tp2;
+                if tc1 > tmin {
+                    tmin = tc1;
+                }
+                if tc2 < tmax {
+                    tmax = tc2;
+                }
+                if tmin.0 > tmax.0 {
+                    return vec![];
+                }
+                if tmax.0 < 0.0 {
+                    return vec![];
+                }
+                ts = (tmin, tmax);
+            } else {
+                return vec![];
+            }
+        }
+
+        let (tmin, tmax) = ts;
+        let mut it = vec![];
+        if tmin.0 > 0.0 {
+            it.push(Intersection::new(scale, tmin.0, raypos, raydir, self.id(), IntersectionType::Entry, tmin.1));
+        }
+        if tmax.0 > 0.0 {
+            it.push(Intersection::new(scale, tmax.0, raypos, raydir, self.id(), IntersectionType::Exit, tmax.1));
+        }
+        it
+    }
+
+    fn inside(&self, pos: Vec3) -> bool {
+        let [x, y, z] = self.transform.inv_transform_point(pos);
+        (x * x + z * z) <= 1.0 && 0.0 <= y && y <= 1.0
+    }
+
+    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+        let [x, y, z] = opos;
+        match face {
+            0 => (self.surface)(0, x.atan2(z), y),
+            1 => (self.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
+            2 => (self.surface)(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
+            _ => panic!("invalid face")
+        }
+    }
+
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.transform.translate(tx, ty, tz);
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.transform.scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.transform.uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.transform.rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.transform.rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.transform.rotatez(d);
+    }
+
+    fn transform_point(&self, p: Vec3) -> Vec3 {
+        self.transform.transform_point(p)
+    }
+
+    fn get_normal(&self, p: Vec3, face: i64) -> Vec3 {
+        let n = match face {
+            0 => [p[0], 0.0, p[2]],
+            1 => [0.0, 1.0, 0.0],
+            2 => [0.0, -1.0, 0.0],
+            _ => panic!("invalid face")
+        };
+        normalize(self.transform.transform_normal(n))
+    }
+}
 
 // class Cone(Primitive):
 //     def _solveCone(self, px, py, pz, dx, dy, dz):

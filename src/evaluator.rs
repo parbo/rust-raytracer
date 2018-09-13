@@ -191,6 +191,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpPlane => eval_plane(stack),
         &tokenizer::Ops::OpPointlight => eval_pointlight(stack),
         &tokenizer::Ops::OpCube => eval_cube(stack),
+        &tokenizer::Ops::OpCylinder => eval_cylinder(stack),
         op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
@@ -572,9 +573,11 @@ fn eval_cube(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
-// def eval_cylinder(env, stack):
-//     surface, stack = pop(stack)
-//     return env, push(stack, primitives.Cylinder(get_surface(surface)))
+fn eval_cylinder(stack: &mut Stack) -> Result<(), EvalError> {
+    let surface = pop(stack)?;
+    stack.push(Value::ValNode(Box::new(primitives::Cylinder::new(move_surface(surface)))));
+    Ok(())
+}
 
 // def eval_cone(env, stack):
 //     surface, stack = pop(stack)

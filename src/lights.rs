@@ -82,27 +82,51 @@ impl Light for PointLight {
     }
 }
 
-// class SpotLight(object):
-//     def __init__(self, pos, at, c, cutoff, exp):
-//         self.pos = pos
-//         self.at = at
-//         self.d = normalize(sub(self.at, self.pos))
-//         self.color = c
-//         self.cutoff = cutoff
-//         self.coscutoff = math.cos(math.radians(self.cutoff))
-//         self.exp = exp
+#[derive(Clone)]
+pub struct SpotLight {
+    pos: Vec3,
+    at: Vec3,
+    d: Vec3,
+    color: Vec3,
+    cutoff: f64,
+    coscutoff: f64,
+    exp: f64
+}
 
-//     def get_direction(self, pos):
-//         d = sub(self.pos, pos)
-//         dl = length(d)
-//         return mul(d, 1.0 / dl), length(d)
+impl SpotLight {
+    pub fn new(pos: Vec3,
+               at: Vec3,
+               color: Vec3,
+               cutoff: f64,
+               exp: f64) -> SpotLight {
+        let d = normalize(sub(at, pos));
+        let coscutoff = cutoff.to_radians().cos();
+        SpotLight {
+            pos: pos, at: at, d: d, color: color, cutoff: cutoff, coscutoff: coscutoff, exp: exp
+        }
+    }
+}
 
-//     def get_intensity(self, pos):
-//         q = sub(self.pos, pos)
-//         dsq = dot(q, q)
-//         invlend = 1 / math.sqrt(dsq)
-//         cosangle = -dot(q, self.d) * invlend
-//         if cosangle < self.coscutoff:
-//             return (0.0, 0.0, 0.0)
-//         i = pow(dot(self.d, mul(d, -invlend)), self.exp)
-//         return mul(self.color, i * 100.0 / (99.0 + dsq))
+impl Light for SpotLight {
+    fn name(&self) -> &str {
+        "spotlight"
+    }
+
+    fn get_direction(&self, pos: Vec3) -> (Vec3, Option<f64>) {
+        let d = sub(self.pos, pos);
+        let dl = length(d);
+        (mul(d, 1.0 / dl), Some(dl))
+    }
+
+    fn get_intensity(&self, pos: Vec3) -> Vec3 {
+        let d = sub(self.pos, pos);
+        let dsq = dot(d, d);
+        let invlend = 1.0 / dsq.sqrt();
+        let cosangle = -dot(d, self.d) * invlend;
+        if cosangle < self.coscutoff {
+            return [0.0, 0.0, 0.0];
+        }
+        let i = dot(self.d, mul(d, -invlend)).powf(self.exp);
+        mul(self.color, i * 100.0 / (99.0 + dsq))
+    }
+}

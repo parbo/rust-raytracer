@@ -190,6 +190,7 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpDifference => eval_difference(stack),
         &tokenizer::Ops::OpPlane => eval_plane(stack),
         &tokenizer::Ops::OpPointlight => eval_pointlight(stack),
+        &tokenizer::Ops::OpSpotlight => eval_spotlight(stack),
         &tokenizer::Ops::OpCube => eval_cube(stack),
         &tokenizer::Ops::OpCylinder => eval_cylinder(stack),
         op => Err(EvalError::OpNotImplemented(op.clone())),
@@ -687,17 +688,19 @@ fn eval_pointlight(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
-// def eval_spotlight(env, stack):
-//     exp, stack = pop(stack)
-//     cutoff, stack = pop(stack)
-//     color, stack = pop(stack)
-//     at, stack = pop(stack)
-//     pos, stack = pop(stack)
-//     return env, push(stack, lights.SpotLight(get_point(pos),
-//                                              get_point(at),
-//                                              get_point(color),
-//                                              get_real(cutoff),
-//                                              get_real(exp)))
+fn eval_spotlight(stack: &mut Stack) -> Result<(), EvalError> {
+    let exp = pop(stack)?;
+    let cutoff = pop(stack)?;
+    let color = pop(stack)?;
+    let at = pop(stack)?;
+    let pos = pop(stack)?;
+    stack.push(Value::ValLight(Box::new(lights::SpotLight::new(move_point(pos),
+                                                               move_point(at),
+                                                               move_point(color),
+                                                               get_real(&cutoff),
+                                                               get_real(&exp)))));
+    Ok(())
+}
 
 fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     let file = pop(stack)?;

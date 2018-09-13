@@ -57,7 +57,7 @@ fn trace(amb: Vec3,
         let mut diffuse = [0.0, 0.0, 0.0];
         let mut specular = [0.0, 0.0, 0.0];
         let pos = node.transform_point(opos);
-        let normal = node.get_normal(opos);
+        let normal = node.get_normal(opos, isect.face);
         for light in lights.iter() {
             let (lightdir, lightdistance) = light.get_direction(pos);
             let df = dot(normal, lightdir);

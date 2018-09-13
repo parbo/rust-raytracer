@@ -1,4 +1,4 @@
-use vecmath::{Vec3, add, dot, mul, neg, length, normalize};
+use vecmath::{Vec3, add, dot, mul, neg, length, normalize, sub};
 use transform::Transform;
 use std::rc::Rc;
 use std::cmp::Ordering;
@@ -37,7 +37,7 @@ pub trait Node: NodeClone {
     fn rotatey(&mut self, d: f64);
     fn rotatez(&mut self, d: f64);
     fn transform_point(&self, p: Vec3) -> Vec3;
-    fn get_normal(&self, p: Vec3) -> Vec3;
+    fn get_normal(&self, p: Vec3, face: i64) -> Vec3;
 }
 
 pub trait NodeClone {
@@ -193,7 +193,6 @@ impl Node for Operator {
     }
     fn get_surface(&self, _opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
         panic!("this should not happen");
-        return ([0.0, 0.0, 0.0], 0.0, 0.0, 0.0);
     }
     fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
         self.obj1.translate(tx, ty, tz);
@@ -222,12 +221,10 @@ impl Node for Operator {
 
     fn transform_point(&self, _p: Vec3) -> Vec3 {
         panic!("this should not happen");
-        return [0.0, 0.0, 0.0];
     }
 
-    fn get_normal(&self, _p: Vec3) -> Vec3 {
+    fn get_normal(&self, _p: Vec3, _face: i64) -> Vec3 {
         panic!("this should not happen");
-        return [1.0, 0.0, 0.0];
     }
 
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
@@ -386,86 +383,144 @@ impl Node for Sphere {
         self.transform.transform_point(p)
     }
 
-    fn get_normal(&self, p: Vec3) -> Vec3 {
+    fn get_normal(&self, p: Vec3, _face: i64) -> Vec3 {
         normalize(self.transform.transform_normal(p))
     }
 }
 
-// class Cube(Primitive):
-//     normals = [(0.0, 0.0, -1.0),
-//                (0.0, 0.0, 1.0),
-//                (-1.0, 0.0, 0.0),
-//                (1.0, 0.0, 0.0),
-//                (0.0, 1.0, 0.0),
-//                (0.0, -1.0, 0.0)]
-//     slabs = [(3, 2),
-//              (4, 5),
-//              (1, 0)]
+static NORMALS : [Vec3;6] = [[0.0, 0.0, -1.0],
+                             [0.0, 0.0, 1.0],
+                             [-1.0, 0.0, 0.0],
+                             [1.0, 0.0, 0.0],
+                             [0.0, 1.0, 0.0],
+                             [0.0, -1.0, 0.0]];
+static SLABS : [(i64, i64);3] = [(3, 2),
+                                 (4, 5),
+                                 (1, 0)];
 
-//     def intersect(self, raypos, raydir):
-//         tr = self.transform
-//         raydir = tr.inv_transform_vector(raydir)
-//         scale = 1.0 / length(raydir)
-//         raydir = mul(raydir, scale) # normalize
-//         raypos = tr.inv_transform_point(raypos)
-//         eps = 1e-15
-//         tmin = None
-//         tmax = None
-//         p = sub((0.5, 0.5, 0.5), raypos)
-//         for i in range(3):
-//             face1, face2 = self.slabs[i]
-//             e = p[i]
-//             f = raydir[i]
-//             if abs(f) > eps:
-//                 t1 = (e + 0.5) / f
-//                 t2 = (e - 0.5) / f
-//                 if t1 > t2:
-//                     t1, t2 = t2, t1
-//                     face1, face2 = face2, face1
-//                 if tmin is None or t1 > tmin[0]:
-//                     tmin = (t1, face1)
-//                 if tmax is None or t2 < tmax[0]:
-//                     tmax = (t2, face2)
-//                 if tmin[0] > tmax[0]:
-//                     return []
-//                 if tmax[0] < 0.0:
-//                     return []
-//             elif -e - 0.5 > 0.0 or -e + 0.5 < 0.0:
-//                 return []
-//         ts = []
-//         if tmin[0] > 0.0:
-//             ts.append(Intersection(scale, tmin[0], raypos, raydir, self, Intersection.ENTRY, tmin[1]))
-//         if tmax[0] > 0.0:
-//             ts.append(Intersection(scale, tmax[0], raypos, raydir, self, Intersection.EXIT, tmax[1]))
-//         return ts
+#[derive(Clone)]
+pub struct Cube {
+    transform: Transform,
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    id: NodeId
+}
 
-//     def inside(self, pos):
-//         x, y, z = self.transform.inv_transform_point(pos)
-//         return 0.0 <= x <= 1.0 and 0.0 <= y <= 1.0 and 0.0 <= z <= 1.0
+impl Cube {
+    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cube {
+        Cube { transform: Default::default(), surface: surface, id: NodeId::new() }
+    }
+}
 
-//     def get_surface(self, i):
-//         x, y, z = i.opos
-//         face = i.face
-//         if face == 0:
-//             return self.surface(0, x, y)
-//         elif face == 1:
-//             return self.surface(1, x, y)
-//         elif face == 2:
-//             return self.surface(2, z, y)
-//         elif face == 3:
-//             return self.surface(3, z, y)
-//         elif face == 4:
-//             return self.surface(4, x, z)
-//         elif face == 5:
-//             return self.surface(5, x, z)
-//         else:
-//             print opos
-//             assert False
+impl Node for Cube {
+    fn name(&self) -> &str {
+        return "cube";
+    }
 
-//     def get_normal(self, i):
-//         return normalize(self.transform.transform_normal(self.normals[i.face]))
+    fn id(&self) -> NodeId {
+        self.id
+    }
 
-// class Cylinder(Primitive):
+    fn find_node(&self, id: NodeId) -> Option<&Node> {
+        if id == self.id {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+        let tr = &self.transform;
+        let transformed_raydir = tr.inv_transform_vector(raydir);
+        let scale = 1.0 / length(transformed_raydir);
+        let normalized_transformed_raydir = mul(transformed_raydir, scale); // normalize
+        let transformed_raypos = tr.inv_transform_point(raypos);
+        let eps = 1e-15;
+        let mut tmin: Option<(f64, i64)> = None;
+        let mut tmax: Option<(f64, i64)> = None;
+        let p = sub([0.5, 0.5, 0.5], transformed_raypos);
+        for i in 0..3 {
+            let (mut face1, mut face2) = SLABS[i];
+            let e = p[i];
+            let f = normalized_transformed_raydir[i];
+            if f.abs() > eps {
+                let mut t1 = (e + 0.5) / f;
+                let mut t2 = (e - 0.5) / f;
+                if t1 > t2 {
+                    mem::swap(&mut t1, &mut t2);
+                    mem::swap(&mut face1, &mut face2);
+                }
+                if tmin.is_none() || t1 > tmin.unwrap().0 {
+                    tmin = Some((t1, face1));
+                }
+                if tmax.is_none() || t2 < tmax.unwrap().0 {
+                    tmax = Some((t2, face2));
+                }
+                if tmin.unwrap().0 > tmax.unwrap().0 {
+                    return vec![];
+                }
+                if tmax.unwrap().0 < 0.0 {
+                    return vec![];
+                }
+            } else if -e - 0.5 > 0.0 || -e + 0.5 < 0.0 {
+                return vec![];
+            }
+        }
+        let mut ts = vec![];
+        if tmin.unwrap().0 > 0.0 {
+            ts.push(Intersection::new(scale, tmin.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Entry, tmin.unwrap().1));
+        }
+        if tmax.unwrap().0 > 0.0 {
+            ts.push(Intersection::new(scale, tmax.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, tmax.unwrap().1));
+        }
+        ts
+    }
+
+    fn inside(&self, pos: Vec3) -> bool {
+        let [x, y, z] = self.transform.inv_transform_point(pos);
+        0.0 <= x && x <= 1.0 && 0.0 <= y && y <= 1.0 && 0.0 <= z && z <= 1.0
+    }
+
+    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+        let [x, y, z] = opos;
+        match face {
+            0 => (self.surface)(0, x, y),
+            1 => (self.surface)(1, x, y),
+            2 => (self.surface)(2, z, y),
+            3 => (self.surface)(3, z, y),
+            4 => (self.surface)(4, x, z),
+            5 => (self.surface)(5, x, z),
+            _ => panic!("unexpected face")
+        }
+    }
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.transform.translate(tx, ty, tz);
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.transform.scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.transform.uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.transform.rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.transform.rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.transform.rotatez(d);
+    }
+
+    fn transform_point(&self, p: Vec3) -> Vec3 {
+        self.transform.transform_point(p)
+    }
+
+    fn get_normal(&self, _p: Vec3, face: i64) -> Vec3 {
+        normalize(self.transform.transform_normal(NORMALS[face as usize]))
+    }
+}
+
+    // class Cylinder(Primitive):
 //     def _solveCyl(self, px, pz, dx, dz):
 //         # solve x ^ 2 + z ^ 2 = 1
 //         # (px + t * dx) ^ 2 + (pz + t * dz) ^ 2 = 1
@@ -752,7 +807,7 @@ impl Node for Plane {
         (self.surface)(0, x, z)
     }
 
-    fn get_normal(&self, _p: Vec3) -> Vec3 {
+    fn get_normal(&self, _p: Vec3, _face: i64) -> Vec3 {
         normalize(self.transform.transform_normal([0.0, 1.0, 0.0]))
     }
 }

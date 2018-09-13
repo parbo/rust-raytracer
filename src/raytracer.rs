@@ -40,7 +40,7 @@ fn get_specular(ic: Color, lightdir: Vec3, sn: Vec3, pos: Vec3, raypos: Vec3, n:
 fn trace(amb: Vec3,
          lights: &[Box<Light>],
          scene: &Node,
-         _depth: i64,
+         depth: i64,
          raypos: Vec3,
          raydir: Vec3)
          -> Pixel {
@@ -88,14 +88,14 @@ fn trace(amb: Vec3,
         let spec = mul(specular, ks);
         let combined = add(diff, spec);
         c = add(c, combined);
-        c
-        // if ks > 0.0 and depth > 0:
-        //     refl_raydir = normalize(sub(raydir, mul(normal, 2 * dot(raydir, normal))))
-        //     poseps = add(pos, mul(refl_raydir, 1e-7))
-        //     rc = trace(amb, lights, scene, depth - 1, poseps, refl_raydir)
-        //     return add(c, mul(cmul(rc, sc), ks))
-        // else:
-        //     return c
+        if ks > 0.0 && depth > 0 {
+            let refl_raydir = normalize(sub(raydir, mul(normal, 2.0 * dot(raydir, normal))));
+            let poseps = add(pos, mul(refl_raydir, 1e-7));
+            let rc = trace(amb, lights, scene, depth - 1, poseps, refl_raydir);
+            add(c, mul(cmul(rc, sc), ks))
+        } else {
+            c
+        }
     } else {
         return [0.0, 0.0, 0.0];
     }

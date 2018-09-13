@@ -194,12 +194,11 @@ fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
         &tokenizer::Ops::OpCube => eval_cube(stack),
         &tokenizer::Ops::OpCylinder => eval_cylinder(stack),
         &tokenizer::Ops::OpCone => eval_cone(stack),
-        op => Err(EvalError::OpNotImplemented(op.clone())),
     }
 }
 
 fn divi(a: i64, b: i64) -> i64 {
-    ((a as f64) / (b as f64)).round() as i64
+    a / b
 }
 
 fn modi(a: i64, b: i64) -> i64 {
@@ -532,7 +531,8 @@ fn eval_get(stack: &mut Stack) -> Result<(), EvalError> {
     if iv < 0 || iv > av.len() as i64 {
         return Err(EvalError::ArrayOutOfBounds(iv, av.len()));
     }
-    stack.push(av[iv as usize].clone());
+    let ix = av.len() - (iv as usize) - 1;
+    stack.push(av[ix].clone());
     Ok(())
 }
 
@@ -956,6 +956,8 @@ mod tests {
         assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
         let (env, _) = run("[1 2 3] 1 get /x");
         assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
+        let (env, _) = run("[0 1 2 3 4 5 6 7 8 9] /a a 0 get /x");
+        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(0));
     }
 
     #[test]

@@ -706,89 +706,158 @@ impl Node for Cylinder {
     }
 }
 
-// class Cone(Primitive):
-//     def _solveCone(self, px, py, pz, dx, dy, dz):
-//         # solve x ^ 2 + z ^ 2 = y ^ 2
-//         # (px + t * dx) ^ 2 + (pz + t * dz) ^ 2 = (py + t * dy) ^ 2
-//         # a * t ^ 2 + b * t + c = 0
-//         # t = (-b +/- sqrt(b ^ 2 - 4 * a * c)) / 2 * a
-//         a = dx * dx + dz * dz - dy * dy
-//         b = 2 * (px * dx + pz * dz - py * dy)
-//         c = px * px + pz * pz - py * py
-//         sq = b * b - 4 * a * c
-//         if sq < 0.0:
-//             return None
-//         else:
-//             root = math.sqrt(sq)
-//             t1 = ((-b - root) / (2.0 * a), 0)
-//             t2 = ((-b + root) / (2.0 * a), 0)
-//             if t1 > t2:
-//                 t1, t2 = t2, t1
-//             return t1, t2
+#[derive(Clone)]
+pub struct Cone {
+    transform: Transform,
+    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    id: NodeId
+}
 
-//     def intersect(self, raypos, raydir):
-//         tr = self.transform
-//         raydir = tr.inv_transform_vector(raydir)
-//         scale = 1.0 / length(raydir)
-//         raydir = mul(raydir, scale) # normalize
-//         raypos = tr.inv_transform_point(raypos)
-//         eps = 1e-7
+impl Cone {
+    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cone {
+        Cone { transform: Default::default(), surface: surface, id: NodeId::new() }
+    }
 
-//         px, py, pz = raypos
-//         dx, dy, dz = raydir
-//         tsc = self._solveCone(px, py, pz, dx, dy, dz)
-//         if not tsc:
-//             return []
-//         tcmin, tcmax = tsc
-//         ts = []
-//         cminy = py + tcmin[0] * dy
-//         cmaxy = py + tcmax[0] * dy
-//         if 0.0 <= cminy <= 1.0:
-//             ts.append(tcmin)
-//         if 0.0 <= cmaxy <= 1.0:
-//             ts.append(tcmax)
-//         if len(ts) == 0:
-//             return []
-//         if len(ts) == 2:
-//             tr = []
-//             if ts[0][0] > 0.0:
-//                 tr.append(Intersection(scale, ts[0][0], raypos, raydir, self, Intersection.ENTRY, ts[0][1]))
-//             if ts[1][0] > 0.0:
-//                 tr.append(Intersection(scale, ts[1][0], raypos, raydir, self, Intersection.EXIT, ts[1][1]))
-//             return tr
-//         # check plane
-//         # since we know there is only one intersection with the cone,
-//         # there must be an intersection in the base
-//         tp = (-py + 1.0) / dy
-//         ts.append((tp, 1))
-//         ts.sort()
-//         tr = []
-//         if ts[0][0] > 0.0:
-//             tr.append(Intersection(scale, ts[0][0], raypos, raydir, self, Intersection.ENTRY, ts[0][1]))
-//         if ts[1][0] > 0.0:
-//             tr.append(Intersection(scale, ts[1][0], raypos, raydir, self, Intersection.EXIT, ts[1][1]))
-//         return tr
+    fn solve_cone(&self, px: f64, py: f64, pz: f64, dx: f64, dy: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
+        // solve x ^ 2 + z ^ 2 = y ^ 2
+        // (px + t * dx) ^ 2 + (pz + t * dz) ^ 2 = (py + t * dy) ^ 2
+        // a * t ^ 2 + b * t + c = 0
+        // t = (-b +/- sqrt(b ^ 2 - 4 * a * c)) / 2 * a
+        let a = dx * dx + dz * dz - dy * dy;
+        let b = 2.0 * (px * dx + pz * dz - py * dy);
+        let c = px * px + pz * pz - py * py;
+        let sq = b * b - 4.0 * a * c;
+        if sq < 0.0 {
+            None
+        } else {
+            let root = sq.sqrt();
+            let mut t1 = ((-b - root) / (2.0 * a), 0);
+            let mut t2 = ((-b + root) / (2.0 * a), 0);
+            if t1 > t2 {
+                mem::swap(&mut t1, &mut t2);
+            }
+            Some((t1, t2))
+        }
+    }
+}
 
-//     def inside(self, pos):
-//         x, y, z = self.transform.inv_transform_point(pos)
-//         return (x * x - y * y + z * z) <= 0.0 and 0.0 <= y <= 1.0
+impl Node for Cone {
+    fn name(&self) -> &str {
+        return "cone";
+    }
 
-//     def get_surface(self, i):
-//         x, y, z = i.opos
-//         face = i.face
-//         if face == 0:
-//             return self.surface(0, atan2(x, z), y)
-//         elif face == 1:
-//             return self.surface(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0)
+    fn id(&self) -> NodeId {
+        self.id
+    }
 
-//     def get_normal(self, i):
-//         if i.face == 0:
-//             x, y, z = i.opos
-//             n = (x, -y, z)
-//         elif i.face == 1:
-//             n = (0.0, 1.0, 0.0)
-//         return normalize(self.transform.transform_normal(n))
+    fn find_node(&self, id: NodeId) -> Option<&Node> {
+        if id == self.id {
+            Some(self)
+        } else {
+            None
+        }
+    }
 
+
+    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+        let tr = &self.transform;
+        let mut raydir = tr.inv_transform_vector(in_raydir);
+        let scale = 1.0 / length(raydir);
+        raydir = mul(raydir, scale); // normalize
+        let raypos = tr.inv_transform_point(in_raypos);
+        let eps = 1e-7;
+
+        let [px, py, pz] = raypos;
+        let [dx, dy, dz] = raydir;
+        let tsc = self.solve_cone(px, py, pz, dx, dy, dz);
+        if let Some((tcmin, tcmax)) = tsc {
+            let mut ts = vec![];
+            let cminy = py + tcmin.0 * dy;
+            let cmaxy = py + tcmax.0 * dy;
+            if 0.0 <= cminy && cminy <= 1.0 {
+                ts.push(tcmin)
+            }
+            if 0.0 <= cmaxy && cmaxy <= 1.0 {
+                ts.push(tcmax)
+            }
+            if ts.len() == 0 {
+                return vec![];
+            }
+            if ts.len() == 2 {
+                let mut tr = vec![];
+                if ts[0].0 > 0.0 {
+                    tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
+                }
+                if ts[1].0 > 0.0 {
+                    tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
+                }
+                return tr;
+            }
+            // check plane
+            // since we know there is only one intersection with the cone,
+            // there must be an intersection in the base
+            let tp = (-py + 1.0) / dy;
+            ts.push((tp, 1));
+            ts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            let mut tr = vec![];
+            if ts[0].0 > 0.0 {
+                tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
+            }
+            if ts[1].0 > 0.0 {
+                tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
+            }
+            tr
+        } else {
+            vec![]
+        }
+    }
+
+    fn inside(&self, pos: Vec3) -> bool {
+        let [x, y, z] = self.transform.inv_transform_point(pos);
+        let p = x * x - y * y + z * z;
+        p <= 0.0 && 0.0 <= y && y <= 1.0
+    }
+
+    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+        let [x, y, z] = opos;
+        match face {
+            0 => (self.surface)(0, x.atan2(z), y),
+            1 => (self.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
+            _ => panic!("invalid face")
+        }
+    }
+
+    fn get_normal(&self, p: Vec3, face: i64) -> Vec3 {
+        let n = match face {
+            0 => [p[0], -p[1], p[2]],
+            1 => [0.0, 1.0, 0.0],
+            _ => panic!("invalid face")
+        };
+        normalize(self.transform.transform_normal(n))
+    }
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.transform.translate(tx, ty, tz);
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.transform.scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.transform.uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.transform.rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.transform.rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.transform.rotatez(d);
+    }
+
+    fn transform_point(&self, p: Vec3) -> Vec3 {
+        self.transform.transform_point(p)
+    }
+}
 
 #[derive(Clone)]
 pub struct Plane {

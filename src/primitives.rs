@@ -889,25 +889,25 @@ impl Node for Plane {
         }
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
         let np = [0.0, 1.0, 0.0];
         let tr = &self.transform;
-        let transformed_raydir = tr.inv_transform_vector(raydir);
-        let scale = 1.0 / length(transformed_raydir);
-        let normalized_transformed_raydir = mul(transformed_raydir, scale);
-        let transformed_raypos = tr.inv_transform_point(raypos);
-        let denom = dot(np, normalized_transformed_raydir);
+        let mut raydir = tr.inv_transform_vector(in_raydir);
+        let scale = 1.0 / length(raydir);
+        raydir = mul(raydir, scale);
+        let raypos = tr.inv_transform_point(in_raypos);
+        let denom = dot(np, raydir);
         if denom.abs() < 1e-7 {
             return vec![];
         }
-        let t = -dot(np, transformed_raypos) / denom;
+        let t = -dot(np, raypos) / denom;
         if t < 0.0 {
             return vec![];
         }
         if denom > 0.0 {
-            return vec![Intersection::new(scale, t, transformed_raypos, normalized_transformed_raydir, self.id, IntersectionType::Exit, 0)];
+            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Exit, 0)];
         } else {
-            return vec![Intersection::new(scale, t, transformed_raypos, normalized_transformed_raydir, self.id, IntersectionType::Entry, 0)];
+            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Entry, 0)];
         }
     }
 

@@ -73,6 +73,7 @@ pub struct Intersection {
     rd: Vec3,
     pub primitive_id: NodeId,
     pub t: IntersectionType,
+    pub original_t: IntersectionType,
     pub face: i64  // Todo: maybe use a type instea
 }
 
@@ -106,10 +107,14 @@ impl Intersection {
             rd: rd,
             primitive_id: primitive_id,
             t: t,
+            original_t: t,
             face: face
         }
     }
 
+    pub fn switched(&self) -> bool {
+        self.t != self.original_t
+    }
     pub fn switch(&mut self, t: IntersectionType) {
         if self.t != t {
             self.t = t;

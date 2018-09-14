@@ -1,4 +1,4 @@
-use vecmath::{normalize, Vec3, mul, cmul, dot, add, sub};
+use vecmath::{normalize, Vec3, mul, cmul, dot, add, sub, neg};
 use std::path::Path;
 use std::io::{Write, Result};
 use std::fs::File;
@@ -57,7 +57,10 @@ fn trace(amb: Vec3,
         let mut diffuse = [0.0, 0.0, 0.0];
         let mut specular = [0.0, 0.0, 0.0];
         let pos = node.transform_point(opos);
-        let normal = node.get_normal(opos, isect.face);
+        let mut normal = node.get_normal(opos, isect.face);
+        if isect.switched() {
+            normal = neg(normal);
+        }
         for light in lights.iter() {
             let (lightdir, lightdistance) = light.get_direction(pos);
             let df = dot(normal, lightdir);

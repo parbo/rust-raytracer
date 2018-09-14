@@ -549,22 +549,22 @@ fn eval_sphere(stack: &mut Stack) -> Result<(), EvalError> {
 }
 
 fn eval_union(stack: &mut Stack) -> Result<(), EvalError> {
-    let obj1 = pop(stack)?;
     let obj2 = pop(stack)?;
+    let obj1 = pop(stack)?;
     stack.push(Value::ValNode(Box::new(primitives::Operator::make_union(move_node(obj1), move_node(obj2)))));
     Ok(())
 }
 
 fn eval_intersect(stack: &mut Stack) -> Result<(), EvalError> {
-    let obj1 = pop(stack)?;
     let obj2 = pop(stack)?;
+    let obj1 = pop(stack)?;
     stack.push(Value::ValNode(Box::new(primitives::Operator::make_intersect(move_node(obj1), move_node(obj2)))));
     Ok(())
 }
 
 fn eval_difference(stack: &mut Stack) -> Result<(), EvalError> {
-    let obj1 = pop(stack)?;
     let obj2 = pop(stack)?;
+    let obj1 = pop(stack)?;
     stack.push(Value::ValNode(Box::new(primitives::Operator::make_difference(move_node(obj1), move_node(obj2)))));
     Ok(())
 }

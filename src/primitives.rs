@@ -287,8 +287,8 @@ impl Node for Operator {
                 i.switch(IntersectionType::Entry);
                 prevt = i.distance;
                 res.push(**i);
-                inside = newinside;
             }
+            inside = newinside;
         }
 
         res

@@ -14,11 +14,7 @@ pub use self::vecmath_lib::vec3_square_len as square_length;
 pub use self::vecmath_lib::vec3_sub as sub;
 pub use self::vecmath_lib::mat4_id as identity;
 pub use self::vecmath_lib::row_mat4_mul as mmmul;
-pub use self::vecmath_lib::row_mat4_col as mrow;
 pub use self::vecmath_lib::row_mat4_transform as transform;
-// pub use self::vecmath_lib::col_mat4_mul as mmmul;
-// pub use self::vecmath_lib::col_mat4_row as mrow;
-// pub use self::vecmath_lib::col_mat4_transform as transform;
 pub use self::vecmath_lib::mat4_transposed as transpose;
 
 pub fn length(v: Vec3) -> f64 {
@@ -32,6 +28,7 @@ pub fn cmul(v1: Vec3, v2: Vec3) -> Vec3 {
 }
 
 pub fn mvmuly(m: Mat4, v: Vec4) -> f64 {
-    let r = mrow(m, 1);
-    r[0] * v[0] + r[1] * v[1] + r[2] * v[2] + r[3] + v[3]
+    let [m21, m22, m23, m24] = m[1];
+    let [ v1, v2, v3, v4] = v;
+    m21 * v1 + m22 * v2 + m23 * v3 + m24 * v4
 }

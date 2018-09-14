@@ -2,7 +2,10 @@
 
 name = "rust-raytracer"
 version = "0.0.1"
-authors = ["Pär Bohrarper <par.bohrarper@gmail.com>"]
+authors = ["Par Bohrarper <par.bohrarper@gmail.com>"]
 
 [dependencies.vecmath]
-version = "0.2.0"
+version = "0.3.1"
+
+[profile.release]
+debug = true

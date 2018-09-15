@@ -27,7 +27,7 @@ pub trait Node: NodeClone {
     fn name(&self) -> &str;
     fn id(&self) -> NodeId;
     fn find_node(&self, id: NodeId) -> Option<&Node>;
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Option<Vec<Intersection>>;
     fn inside(&self, pos: Vec3) -> bool;
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64);
     fn translate(&mut self, tx: f64, ty: f64, tz: f64);
@@ -232,7 +232,7 @@ impl Node for Operator {
         panic!("this should not happen");
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Option<Vec<Intersection>> {
         let mut inside1 = 0;
         let mut inside2 = 0;
         // if self.obj1.inside(raypos) {
@@ -245,9 +245,9 @@ impl Node for Operator {
         let obj1i = self.obj1.intersect(raypos, raydir);
         let obj2i = self.obj2.intersect(raypos, raydir);
 
-        let mut intersections: Vec<(&Intersection, i32)> = obj1i.iter()
+        let mut intersections: Vec<(&Intersection, i32)> = obj1i.iter().flat_map(|v| v)
             .zip(iter::repeat(1))
-            .chain(obj2i.iter()
+            .chain(obj2i.iter().flat_map(|v| v)
                    .zip(iter::repeat(2)))
             .collect();
         intersections.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -293,7 +293,7 @@ impl Node for Operator {
             inside = newinside;
         }
 
-        res
+        Some(res)
     }
 }
 
@@ -327,7 +327,7 @@ impl Node for Sphere {
         }
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Option<Vec<Intersection>> {
         let tr = &self.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
         let scale = 1.0 / length(transformed_raydir);
@@ -336,11 +336,11 @@ impl Node for Sphere {
         let s = dot(neg(transformed_raypos), normalized_transformed_raydir);
         let lsq = dot(transformed_raypos, transformed_raypos);
         if s < 0.0 && lsq > 1.0 {
-            return vec![];
+            return None;
         }
         let msq = lsq - s * s;
         if msq > 1.0 {
-            return vec![];
+            return None;
         }
         let q = (1.0 - msq).sqrt();
         let mut t1 = s + q;
@@ -355,7 +355,7 @@ impl Node for Sphere {
         if t2 > 0.0 {
             ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, 0));
         }
-        ts
+        Some(ts)
     }
     fn inside(&self, pos: Vec3) -> bool {
         let transformed_pos = self.transform.inv_transform_point(pos);
@@ -435,7 +435,7 @@ impl Node for Cube {
         }
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Option<Vec<Intersection>> {
         let tr = &self.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
         let scale = 1.0 / length(transformed_raydir);
@@ -463,13 +463,13 @@ impl Node for Cube {
                     tmax = Some((t2, face2));
                 }
                 if tmin.unwrap().0 > tmax.unwrap().0 {
-                    return vec![];
+                    return None;
                 }
                 if tmax.unwrap().0 < 0.0 {
-                    return vec![];
+                    return None;
                 }
             } else if -e - 0.5 > 0.0 || -e + 0.5 < 0.0 {
-                return vec![];
+                return None;
             }
         }
         let mut ts = vec![];
@@ -479,7 +479,7 @@ impl Node for Cube {
         if tmax.unwrap().0 > 0.0 {
             ts.push(Intersection::new(scale, tmax.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, tmax.unwrap().1));
         }
-        ts
+        Some(ts)
     }
 
     fn inside(&self, pos: Vec3) -> bool {
@@ -594,7 +594,7 @@ impl Node for Cylinder {
     }
 
 
-    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Option<Vec<Intersection>> {
         let tr = &self.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
@@ -610,20 +610,20 @@ impl Node for Cylinder {
             let frsd = 1.0 - px * px - pz * pz;
             if frsd < 0.0 {
                 // outside cylinder
-                return vec![];
+                return None;
             }
             ts = self.solve_plane(py, dy);
         } else if dy.abs() < eps {
             // ray is orthogonal to the cylinder axis
             // check planes
             if py < 0.0 || py > 1.0 {
-                return vec![];
+                return None;
             }
             // check cylinder
             if let Some(res) = self.solve_cyl(px, pz, dx, dz) {
                 ts = res;
             } else {
-                return vec![];
+                return None;
             }
         } else {
             // general case
@@ -642,14 +642,14 @@ impl Node for Cylinder {
                     tmax = tc2;
                 }
                 if tmin.0 > tmax.0 {
-                    return vec![];
+                    return None;
                 }
                 if tmax.0 < 0.0 {
-                    return vec![];
+                    return None;
                 }
                 ts = (tmin, tmax);
             } else {
-                return vec![];
+                return None;
             }
         }
 
@@ -661,7 +661,7 @@ impl Node for Cylinder {
         if tmax.0 > 0.0 {
             it.push(Intersection::new(scale, tmax.0, raypos, raydir, self.id(), IntersectionType::Exit, tmax.1));
         }
-        it
+        Some(it)
     }
 
     fn inside(&self, pos: Vec3) -> bool {
@@ -766,7 +766,7 @@ impl Node for Cone {
     }
 
 
-    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Option<Vec<Intersection>> {
         let tr = &self.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
@@ -788,7 +788,7 @@ impl Node for Cone {
                 ts.push(tcmax)
             }
             if ts.len() == 0 {
-                return vec![];
+                return None;
             }
             if ts.len() == 2 {
                 let mut tr = vec![];
@@ -798,7 +798,7 @@ impl Node for Cone {
                 if ts[1].0 > 0.0 {
                     tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
                 }
-                return tr;
+                return Some(tr);
             }
             // check plane
             // since we know there is only one intersection with the cone,
@@ -813,9 +813,9 @@ impl Node for Cone {
             if ts[1].0 > 0.0 {
                 tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
             }
-            tr
+            Some(tr)
         } else {
-            vec![]
+            None
         }
     }
 
@@ -896,7 +896,7 @@ impl Node for Plane {
         }
     }
 
-    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Option<Vec<Intersection>> {
         let np = [0.0, 1.0, 0.0];
         let tr = &self.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
@@ -905,16 +905,16 @@ impl Node for Plane {
         let raypos = tr.inv_transform_point(in_raypos);
         let denom = dot(np, raydir);
         if denom.abs() < 1e-7 {
-            return vec![];
+            return None;
         }
         let t = -dot(np, raypos) / denom;
         if t < 0.0 {
-            return vec![];
+            return None;
         }
         if denom > 0.0 {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Exit, 0)];
+            return Some(vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Exit, 0)]);
         } else {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Entry, 0)];
+            return Some(vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Entry, 0)]);
         }
     }
 

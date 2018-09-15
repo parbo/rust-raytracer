@@ -46,9 +46,9 @@ fn trace(amb: Vec3,
          raypos: Vec3,
          raydir: Vec3)
          -> Pixel {
-    let i = scene.intersect(raypos, raydir);
-    if i.len() > 0 {
-        let ref isect = &i[0];
+    let intersections = scene.intersect(raypos, raydir);
+    let mut i = intersections.iter().flat_map(|v| v).take(1);
+    if let Some(isect) = i.next() {
         if isect.t == IntersectionType::Exit {
             return [0.0, 0.0, 0.0];
         }
@@ -68,16 +68,19 @@ fn trace(amb: Vec3,
             let df = dot(normal, lightdir);
             if df > 0.0 {
                 let poseps = add(pos, mul(lightdir, 1e-7));
-                let lighti = scene.intersect(poseps, lightdir);
-                // This must be possible to do more nicely
-                let mut do_lights = lighti.len() == 0;
-                if !do_lights {
-                    if let Some(ld) = lightdistance {
-                        if ld < i[0].distance {
-                            do_lights = true;
+                let intersections = scene.intersect(poseps, lightdir);
+                let mut lighti = intersections.iter().flat_map(|v| v).take(1);
+                let do_lights = {
+                    if let Some(lightisect) = lighti.next() {
+                        if let Some(ld) = lightdistance {
+                            ld < lightisect.distance
+                        } else {
+                            false
                         }
+                    } else {
+                        false
                     }
-                }
+                };
                 if do_lights {
                     let ic = cmul(sc, light.get_intensity(pos));
                     if kd > 0.0 {

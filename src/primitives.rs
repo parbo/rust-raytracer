@@ -235,12 +235,12 @@ impl Node for Operator {
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
         let mut inside1 = 0;
         let mut inside2 = 0;
-        if self.obj1.inside(raypos) {
-            inside1 = 1;
-        }
-        if self.obj2.inside(raypos) {
-            inside2 = 1;
-        }
+        // if self.obj1.inside(raypos) {
+        //     inside1 = 1;
+        // }
+        // if self.obj2.inside(raypos) {
+        //     inside2 = 1;
+        // }
         let mut inside = (self.rule)(inside1 > 0, inside2 > 0);
         let mut obj1i = self.obj1.intersect(raypos, raydir);
         let mut obj2i = self.obj2.intersect(raypos, raydir);

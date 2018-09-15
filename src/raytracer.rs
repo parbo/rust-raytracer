@@ -73,7 +73,7 @@ fn trace(amb: Vec3,
                 let mut do_lights = lighti.len() == 0;
                 if !do_lights {
                     if let Some(ld) = lightdistance {
-                        if ld < i[0].distance {
+                        if ld < lighti[0].distance {
                             do_lights = true;
                         }
                     }

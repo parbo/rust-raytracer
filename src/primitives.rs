@@ -242,19 +242,19 @@ impl Node for Operator {
         //     inside2 = 1;
         // }
         let mut inside = (self.rule)(inside1 > 0, inside2 > 0);
-        let mut obj1i = self.obj1.intersect(raypos, raydir);
-        let mut obj2i = self.obj2.intersect(raypos, raydir);
+        let obj1i = self.obj1.intersect(raypos, raydir);
+        let obj2i = self.obj2.intersect(raypos, raydir);
 
-        let mut intersections: Vec<(&mut Intersection, i32)> = obj1i.iter_mut()
+        let mut intersections: Vec<(&Intersection, i32)> = obj1i.iter()
             .zip(iter::repeat(1))
-            .chain(obj2i.iter_mut()
+            .chain(obj2i.iter()
                    .zip(iter::repeat(2)))
             .collect();
         intersections.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
         let mut res = Vec::<Intersection>::new();
         let mut prevt = 0.0;
-        for (ref mut i, obj) in intersections.iter_mut() {
+        for (ref i, obj) in intersections.iter() {
             match i.t {
                 IntersectionType::Entry => {
                     if *obj == 1 {
@@ -279,14 +279,16 @@ impl Node for Operator {
                     // to avoid problem with difference of touching surfaces
                     res.pop();
                 } else {
-                    i.switch(IntersectionType::Exit);
-                    res.push(**i);
+                    let mut ic = **i;
+                    ic.switch(IntersectionType::Exit);
+                    res.push(ic);
                 }
             }
             if !inside && newinside {
-                i.switch(IntersectionType::Entry);
-                prevt = i.distance;
-                res.push(**i);
+                let mut ic = **i;
+                ic.switch(IntersectionType::Entry);
+                prevt = ic.distance;
+                res.push(ic);
             }
             inside = newinside;
         }

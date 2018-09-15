@@ -13,13 +13,15 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()
     let path = Path::new(filename);
     let mut file = try!(File::create(&path));
     let header = format!("P6 {} {} 255\n", w, h);
-    try!(file.write(header.as_bytes()));
+    let mut data = vec![];
+    data.reserve(header.len() + pixels.len() * 3);
+    data.extend(header.as_bytes());
     for p in pixels {
-        let p_bytes = [(255.0 * p[0].max(0.0).min(1.0)) as u8,
-                       (255.0 * p[1].max(0.0).min(1.0)) as u8,
-                       (255.0 * p[2].max(0.0).min(1.0)) as u8];
-        try!(file.write(&p_bytes));
+        data.push((255.0 * p[0].max(0.0).min(1.0)) as u8);
+        data.push((255.0 * p[1].max(0.0).min(1.0)) as u8);
+        data.push((255.0 * p[2].max(0.0).min(1.0)) as u8);
     }
+    try!(file.write(&data));
     Ok(())
 }
 
@@ -114,6 +116,7 @@ pub fn render(amb: Vec3,
               filename: &str) {
     println!("render to filename: {:?}", filename);
     let mut pixels = Vec::new();
+    pixels.reserve((w * h) as usize);
     let raypos = [0.0, 0.0, -1.0];
     let w_world = 2.0 * (0.5 * fov.to_radians()).tan();
     let h_world = h as f64 * w_world / w as f64;

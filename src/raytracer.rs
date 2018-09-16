@@ -106,17 +106,14 @@ fn trace(amb: Vec3,
     }
 }
 
-pub fn render(amb: Vec3,
-              lights: Vec<Box<Light>>,
-              scene: Box<Node>,
-              depth: i64,
-              fov: f64,
-              w: i64,
-              h: i64,
-              filename: &str) {
-    println!("render to filename: {:?}", filename);
-    let mut pixels = Vec::new();
-    pixels.reserve((w * h) as usize);
+pub fn render_pixels(amb: Vec3,
+                     lights: Vec<Box<Light>>,
+                     scene: Box<Node>,
+                     depth: i64,
+                     fov: f64,
+                     w: i64,
+                     h: i64,
+                     put_pixel: &mut FnMut(i64, i64, Pixel) -> ()) {
     let raypos = [0.0, 0.0, -1.0];
     let w_world = 2.0 * (0.5 * fov.to_radians()).tan();
     let h_world = h as f64 * w_world / w as f64;
@@ -135,9 +132,23 @@ pub fn render(amb: Vec3,
                           depth,
                           raypos,
                           raydir);
-            pixels.push(p);
+            put_pixel(ix, iy, p);
         }
     }
+}
+
+pub fn render(amb: Vec3,
+              lights: Vec<Box<Light>>,
+              scene: Box<Node>,
+              depth: i64,
+              fov: f64,
+              w: i64,
+              h: i64,
+              filename: &str) {
+    println!("render to filename: {:?}", filename);
+    let mut pixels = Vec::new();
+    pixels.resize((w * h) as usize, [0.0, 0.0, 0.0]);
+    render_pixels(amb, lights, scene, depth, fov, w, h, &mut |x, y, p| pixels[(x + y * w) as usize] = p);
     write_ppm_file(&pixels, w, h, filename).expect("failed to write file");
 }
 

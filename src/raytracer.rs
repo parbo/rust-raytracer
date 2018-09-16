@@ -6,8 +6,8 @@ use std::rc::Rc;
 use primitives::{Node, Sphere, IntersectionType};
 use lights::{Light, DirectionalLight};
 
-type Pixel = [f64; 3];
-type Color = [f64; 3];
+pub type Pixel = [f64; 3];
+pub type Color = [f64; 3];
 
 fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()> {
     let path = Path::new(filename);

@@ -4,6 +4,14 @@ name = "rust-raytracer"
 version = "0.0.1"
 authors = ["Par Bohrarper <par.bohrarper@gmail.com>"]
 
+[lib]
+name = "rust_raytracer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rust-raytracer"
+path = "src/main.rs"
+
 [dependencies.vecmath]
 version = "0.3.1"
 

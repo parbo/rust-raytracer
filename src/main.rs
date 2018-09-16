@@ -1,11 +1,4 @@
-mod evaluator;
-mod parser;
-mod primitives;
-mod raytracer;
-mod tokenizer;
-mod vecmath;
-mod transform;
-mod lights;
+extern crate rust_raytracer;
 
 use std::env;
 use std::fs::File;
@@ -50,6 +43,6 @@ fn main() {
     let mut defines = HashSet::<String>::new();
     if let Ok(lines) = get_contents(Path::new(filename), &mut defines) {
         let contents = lines.join("\n");
-        evaluator::run(&contents);
+        rust_raytracer::render::render_gml(&contents);
     }
 }

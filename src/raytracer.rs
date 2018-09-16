@@ -137,6 +137,7 @@ pub fn render_pixels(amb: Vec3,
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render(amb: Vec3,
               lights: Vec<Box<Light>>,
               scene: Box<Node>,
@@ -150,6 +151,17 @@ pub fn render(amb: Vec3,
     pixels.resize((w * h) as usize, [0.0, 0.0, 0.0]);
     render_pixels(amb, lights, scene, depth, fov, w, h, &mut |x, y, p| pixels[(x + y * w) as usize] = p);
     write_ppm_file(&pixels, w, h, filename).expect("failed to write file");
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn render(amb: Vec3,
+              lights: Vec<Box<Light>>,
+              scene: Box<Node>,
+              depth: i64,
+              fov: f64,
+              w: i64,
+              h: i64,
+              filename: &str) {
 }
 
 #[test]

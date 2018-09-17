@@ -4,6 +4,7 @@ use std::rc::Rc;
 use std::cmp::Ordering;
 use std::mem;
 use std::iter;
+use std::cell::RefCell;
 use std::sync::atomic::{self, AtomicUsize};
 
 static NODE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
@@ -27,7 +28,7 @@ pub trait Node: NodeClone {
     fn name(&self) -> &str;
     fn id(&self) -> NodeId;
     fn find_node(&self, id: NodeId) -> Option<&Node>;
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
+    fn intersect<'a>(&'a self, raypos: Vec3, raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a>;
     fn inside(&self, pos: Vec3) -> bool;
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64);
     fn translate(&mut self, tx: f64, ty: f64, tz: f64);
@@ -132,7 +133,9 @@ pub struct Operator {
     obj2: Box<Node>,
     rule: &'static Fn(bool, bool) -> bool,
     name: &'static str,
-    id: NodeId
+    id: NodeId,
+    intersections: RefCell<Vec<Intersection>>,
+    op_intersections: RefCell<Vec<(Intersection, i32)>>
 }
 
 fn union(a: bool, b: bool) -> bool {
@@ -154,7 +157,9 @@ impl Operator {
             obj2: obj2,
             rule: &union,
             name: "union",
-            id: NodeId::new()
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new()),
+            op_intersections: RefCell::new(Vec::new())
         }
     }
     pub fn make_intersect(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
@@ -163,7 +168,9 @@ impl Operator {
             obj2: obj2,
             rule: &intersect,
             name: "intersect",
-            id: NodeId::new()
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new()),
+            op_intersections: RefCell::new(Vec::new())
         }
     }
     pub fn make_difference(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
@@ -172,7 +179,49 @@ impl Operator {
             obj2: obj2,
             rule: &difference,
             name: "difference",
-            id: NodeId::new()
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new()),
+            op_intersections: RefCell::new(Vec::new())
+        }
+    }
+}
+
+pub trait GetIntersection {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection>;
+}
+
+struct NodeIntersectionIterator<'a,  T: GetIntersection + 'a> {
+    node: &'a T,
+    current: usize
+}
+
+impl<'a, T: GetIntersection> NodeIntersectionIterator<'a, T> {
+    fn new(node: &'a T) -> NodeIntersectionIterator<'a, T> {
+        NodeIntersectionIterator {
+            node: node,
+            current: 0
+        }
+    }
+}
+
+impl<'a, T> Iterator for NodeIntersectionIterator<'a, T>
+where T: GetIntersection {
+    type Item = Intersection;
+
+    fn next(&mut self) -> Option<Intersection> {
+        let ix = self.current;
+        self.current = self.current + 1;
+        self.node.get_intersection(ix)
+    }
+}
+
+impl GetIntersection for Operator {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection> {
+        let i = self.intersections.borrow();
+        if ix < i.len() {
+            Some(i[ix])
+        } else {
+            None
         }
     }
 }
@@ -232,7 +281,7 @@ impl Node for Operator {
         panic!("this should not happen");
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect<'a>(&'a self, raypos: Vec3, raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a> {
         let mut inside1 = 0;
         let mut inside2 = 0;
         // if self.obj1.inside(raypos) {
@@ -245,16 +294,19 @@ impl Node for Operator {
         let obj1i = self.obj1.intersect(raypos, raydir);
         let obj2i = self.obj2.intersect(raypos, raydir);
 
-        let mut intersections: Vec<(&Intersection, i32)> = obj1i.iter()
+        let mut opis = self.op_intersections.borrow_mut();
+        opis.clear();
+        let mut v : Vec<(Intersection, i32)> = obj1i
             .zip(iter::repeat(1))
-            .chain(obj2i.iter()
-                   .zip(iter::repeat(2)))
-            .collect();
-        intersections.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            .chain(obj2i
+                   .zip(iter::repeat(2))).collect();
+        v.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        opis.extend(v);
 
-        let mut res = Vec::<Intersection>::new();
+        let mut res = self.intersections.borrow_mut();
+        res.clear();
         let mut prevt = 0.0;
-        for (ref i, obj) in intersections.iter() {
+        for (i, obj) in opis.iter() {
             match i.t {
                 IntersectionType::Entry => {
                     if *obj == 1 {
@@ -279,13 +331,13 @@ impl Node for Operator {
                     // to avoid problem with difference of touching surfaces
                     res.pop();
                 } else {
-                    let mut ic = **i;
+                    let mut ic = *i;
                     ic.switch(IntersectionType::Exit);
                     res.push(ic);
                 }
             }
             if !inside && newinside {
-                let mut ic = **i;
+                let mut ic = *i;
                 ic.switch(IntersectionType::Entry);
                 prevt = ic.distance;
                 res.push(ic);
@@ -293,7 +345,7 @@ impl Node for Operator {
             inside = newinside;
         }
 
-        res
+        Box::new(NodeIntersectionIterator::<Operator>::new(&self))
     }
 }
 
@@ -301,12 +353,29 @@ impl Node for Operator {
 pub struct Sphere {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
+    id: NodeId,
+    intersections: RefCell<Vec<Intersection>>
 }
 
 impl Sphere {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
-        Sphere { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Sphere {
+            transform: Default::default(),
+            surface: surface,
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new())
+        }
+    }
+}
+
+impl GetIntersection for Sphere {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection> {
+        let i = self.intersections.borrow();
+        if ix < i.len() {
+            Some(i[ix])
+        } else {
+            None
+        }
     }
 }
 
@@ -327,7 +396,9 @@ impl Node for Sphere {
         }
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect<'a>(&'a self, raypos: Vec3, raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a> {
+        let mut ts = self.intersections.borrow_mut();
+        ts.clear();
         let tr = &self.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
         let scale = 1.0 / length(transformed_raydir);
@@ -336,11 +407,11 @@ impl Node for Sphere {
         let s = dot(neg(transformed_raypos), normalized_transformed_raydir);
         let lsq = dot(transformed_raypos, transformed_raypos);
         if s < 0.0 && lsq > 1.0 {
-            return vec![];
+            return Box::new(NodeIntersectionIterator::<Sphere>::new(&self));
         }
         let msq = lsq - s * s;
         if msq > 1.0 {
-            return vec![];
+            return Box::new(NodeIntersectionIterator::<Sphere>::new(&self));
         }
         let q = (1.0 - msq).sqrt();
         let mut t1 = s + q;
@@ -348,14 +419,13 @@ impl Node for Sphere {
         if t1 > t2 {
             mem::swap(&mut t1, &mut t2);
         }
-        let mut ts = vec![];
         if t1 > 0.0 {
             ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Entry, 0));
         }
         if t2 > 0.0 {
             ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, 0));
         }
-        ts
+        return Box::new(NodeIntersectionIterator::<Sphere>::new(&self));
     }
     fn inside(&self, pos: Vec3) -> bool {
         let transformed_pos = self.transform.inv_transform_point(pos);
@@ -409,12 +479,29 @@ static SLABS : [(i64, i64);3] = [(3, 2),
 pub struct Cube {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
+    id: NodeId,
+    intersections: RefCell<Vec<Intersection>>
 }
 
 impl Cube {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cube {
-        Cube { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Cube {
+            transform: Default::default(),
+            surface: surface,
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new()),
+        }
+    }
+}
+
+impl GetIntersection for Cube {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection> {
+        let i = self.intersections.borrow();
+        if ix < i.len() {
+            Some(i[ix])
+        } else {
+            None
+        }
     }
 }
 
@@ -435,7 +522,9 @@ impl Node for Cube {
         }
     }
 
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
+    fn intersect<'a>(&'a self, raypos: Vec3, raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a> {
+        let mut ts = self.intersections.borrow_mut();
+        ts.clear();
         let tr = &self.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
         let scale = 1.0 / length(transformed_raydir);
@@ -463,23 +552,22 @@ impl Node for Cube {
                     tmax = Some((t2, face2));
                 }
                 if tmin.unwrap().0 > tmax.unwrap().0 {
-                    return vec![];
+                    return Box::new(NodeIntersectionIterator::<Cube>::new(&self));
                 }
                 if tmax.unwrap().0 < 0.0 {
-                    return vec![];
+                    return Box::new(NodeIntersectionIterator::<Cube>::new(&self));
                 }
             } else if -e - 0.5 > 0.0 || -e + 0.5 < 0.0 {
-                return vec![];
+                return Box::new(NodeIntersectionIterator::<Cube>::new(&self));
             }
         }
-        let mut ts = vec![];
         if tmin.unwrap().0 > 0.0 {
             ts.push(Intersection::new(scale, tmin.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Entry, tmin.unwrap().1));
         }
         if tmax.unwrap().0 > 0.0 {
             ts.push(Intersection::new(scale, tmax.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, tmax.unwrap().1));
         }
-        ts
+        return Box::new(NodeIntersectionIterator::<Cube>::new(&self));
     }
 
     fn inside(&self, pos: Vec3) -> bool {
@@ -531,12 +619,29 @@ impl Node for Cube {
 pub struct Cylinder {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
+    id: NodeId,
+    intersections: RefCell<Vec<Intersection>>,
+}
+
+impl GetIntersection for Cylinder {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection> {
+        let i = self.intersections.borrow();
+        if ix < i.len() {
+            Some(i[ix])
+        } else {
+            None
+        }
+    }
 }
 
 impl Cylinder {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cylinder {
-        Cylinder { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Cylinder {
+            transform: Default::default(),
+            surface: surface,
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new())
+        }
     }
 
     fn solve_cyl(&self, px: f64, pz: f64, dx: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
@@ -593,8 +698,9 @@ impl Node for Cylinder {
         }
     }
 
-
-    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+    fn intersect<'a>(&'a self, in_raypos: Vec3, in_raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a> {
+        let mut it = self.intersections.borrow_mut();
+        it.clear();
         let tr = &self.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
@@ -610,20 +716,20 @@ impl Node for Cylinder {
             let frsd = 1.0 - px * px - pz * pz;
             if frsd < 0.0 {
                 // outside cylinder
-                return vec![];
+                return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
             }
             ts = self.solve_plane(py, dy);
         } else if dy.abs() < eps {
             // ray is orthogonal to the cylinder axis
             // check planes
             if py < 0.0 || py > 1.0 {
-                return vec![];
+                return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
             }
             // check cylinder
             if let Some(res) = self.solve_cyl(px, pz, dx, dz) {
                 ts = res;
             } else {
-                return vec![];
+                return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
             }
         } else {
             // general case
@@ -642,26 +748,25 @@ impl Node for Cylinder {
                     tmax = tc2;
                 }
                 if tmin.0 > tmax.0 {
-                    return vec![];
+                    return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
                 }
                 if tmax.0 < 0.0 {
-                    return vec![];
+                    return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
                 }
                 ts = (tmin, tmax);
             } else {
-                return vec![];
+                return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
             }
         }
 
         let (tmin, tmax) = ts;
-        let mut it = vec![];
         if tmin.0 > 0.0 {
             it.push(Intersection::new(scale, tmin.0, raypos, raydir, self.id(), IntersectionType::Entry, tmin.1));
         }
         if tmax.0 > 0.0 {
             it.push(Intersection::new(scale, tmax.0, raypos, raydir, self.id(), IntersectionType::Exit, tmax.1));
         }
-        it
+        return Box::new(NodeIntersectionIterator::<Cylinder>::new(&self));
     }
 
     fn inside(&self, pos: Vec3) -> bool {
@@ -717,12 +822,29 @@ impl Node for Cylinder {
 pub struct Cone {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
+    id: NodeId,
+    intersections: RefCell<Vec<Intersection>>
+}
+
+impl GetIntersection for Cone {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection> {
+        let i = self.intersections.borrow();
+        if ix < i.len() {
+            Some(i[ix])
+        } else {
+            None
+        }
+    }
 }
 
 impl Cone {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cone {
-        Cone { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Cone {
+            transform: Default::default(),
+            surface: surface,
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new())
+        }
     }
 
     fn solve_cone(&self, px: f64, py: f64, pz: f64, dx: f64, dy: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
@@ -765,8 +887,9 @@ impl Node for Cone {
         }
     }
 
-
-    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+    fn intersect<'a>(&'a self, in_raypos: Vec3, in_raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a> {
+        let mut is = self.intersections.borrow_mut();
+        is.clear();
         let tr = &self.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
@@ -788,17 +911,16 @@ impl Node for Cone {
                 ts.push(tcmax)
             }
             if ts.len() == 0 {
-                return vec![];
+                return Box::new(NodeIntersectionIterator::<Cone>::new(&self));
             }
             if ts.len() == 2 {
-                let mut tr = vec![];
                 if ts[0].0 > 0.0 {
-                    tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
+                    is.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
                 }
                 if ts[1].0 > 0.0 {
-                    tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
+                    is.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
                 }
-                return tr;
+                return Box::new(NodeIntersectionIterator::<Cone>::new(&self));
             }
             // check plane
             // since we know there is only one intersection with the cone,
@@ -806,16 +928,15 @@ impl Node for Cone {
             let tp = (-py + 1.0) / dy;
             ts.push((tp, 1));
             ts.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-            let mut tr = vec![];
             if ts[0].0 > 0.0 {
-                tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
+                is.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
             }
             if ts[1].0 > 0.0 {
-                tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
+                is.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
             }
-            tr
+            return Box::new(NodeIntersectionIterator::<Cone>::new(&self));
         } else {
-            vec![]
+            return Box::new(NodeIntersectionIterator::<Cone>::new(&self));
         }
     }
 
@@ -870,12 +991,29 @@ impl Node for Cone {
 pub struct Plane {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
+    id: NodeId,
+    intersections: RefCell<Vec<Intersection>>
+}
+
+impl GetIntersection for Plane {
+    fn get_intersection(&self, ix: usize) -> Option<Intersection> {
+        let i = self.intersections.borrow();
+        if ix < i.len() {
+            Some(i[ix])
+        } else {
+            None
+        }
+    }
 }
 
 impl Plane {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Self {
-        Plane { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Plane {
+            transform: Default::default(),
+            surface: surface,
+            id: NodeId::new(),
+            intersections: RefCell::new(Vec::new())
+        }
     }
 }
 
@@ -896,7 +1034,8 @@ impl Node for Plane {
         }
     }
 
-    fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
+    fn intersect<'a>(&'a self, in_raypos: Vec3, in_raydir: Vec3) -> Box<Iterator<Item = Intersection> + 'a> {
+        let mut ts = self.intersections.borrow_mut();
         let np = [0.0, 1.0, 0.0];
         let tr = &self.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
@@ -904,18 +1043,17 @@ impl Node for Plane {
         raydir = mul(raydir, scale);
         let raypos = tr.inv_transform_point(in_raypos);
         let denom = dot(np, raydir);
-        if denom.abs() < 1e-7 {
-            return vec![];
+        if denom.abs() > 1e-7 {
+            let t = -dot(np, raypos) / denom;
+            if t >= 0.0 {
+                if denom > 0.0 {
+                    ts.push(Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Exit, 0));
+                } else {
+                    ts.push(Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Entry, 0));
+                }
+            }
         }
-        let t = -dot(np, raypos) / denom;
-        if t < 0.0 {
-            return vec![];
-        }
-        if denom > 0.0 {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Exit, 0)];
-        } else {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Entry, 0)];
-        }
+        return Box::new(NodeIntersectionIterator::<Plane>::new(&self));
     }
 
     fn inside(&self, pos: Vec3) -> bool {
@@ -976,7 +1114,7 @@ fn test_intersection_sphere() {
     let mut obj = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
     obj.translate(0.0, 0.0, 5.0);
     let mut intersections = obj.intersect([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
-    for i in intersections.iter_mut() {
+    for i in intersections {
         println!("Intersection type: {:?}, distance: {:?}", i.t, i.distance);
     }
 }

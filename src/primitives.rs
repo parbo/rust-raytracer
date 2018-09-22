@@ -468,28 +468,46 @@ impl IntersectRay for Cube {
                     mem::swap(&mut t1, &mut t2);
                     mem::swap(&mut face1, &mut face2);
                 }
-                if tmin.is_none() || t1 > tmin.unwrap().0 {
-                    tmin = Some((t1, face1));
+                tmin = match tmin {
+                    Some(v) if v.0 >= t1 => {
+                        tmin
+                    },
+                    _ => Some((t1, face1))
+                };
+                tmax = match tmax {
+                    Some(v) if v.0 <= t2 => {
+                        tmax
+                    },
+                    _ => Some((t2, face2))
+                };
+                match (tmin, tmax) {
+                    (Some(a), Some(b)) if a.0 > b.0 => {
+                        return vec![]
+                    },
+                    _ => {}
                 }
-                if tmax.is_none() || t2 < tmax.unwrap().0 {
-                    tmax = Some((t2, face2));
-                }
-                if tmin.unwrap().0 > tmax.unwrap().0 {
-                    return vec![];
-                }
-                if tmax.unwrap().0 < 0.0 {
-                    return vec![];
+                match tmax {
+                    Some(b) if b.0 < 0.0 => {
+                        return vec![];
+                    },
+                    _ => {}
                 }
             } else if -e - 0.5 > 0.0 || -e + 0.5 < 0.0 {
                 return vec![];
             }
         }
         let mut ts = vec![];
-        if tmin.unwrap().0 > 0.0 {
-            ts.push(Intersection::new(scale, tmin.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Entry, tmin.unwrap().1));
+        match tmin {
+            Some(a) if a.0 > 0.0 => {
+                ts.push(Intersection::new(scale, a.0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Entry, a.1));
+            },
+            _ => {}
         }
-        if tmax.unwrap().0 > 0.0 {
-            ts.push(Intersection::new(scale, tmax.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Exit, tmax.unwrap().1));
+        match tmax {
+            Some(b) if b.0 > 0.0 => {
+                ts.push(Intersection::new(scale, b.0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Exit, b.1));
+            },
+            _ => {}
         }
         ts
     }

@@ -121,6 +121,7 @@ fn pop(stack: &mut Stack) -> Result<Value, EvalError> {
 enum EvalError {
     EmptyStack,
     WrongType(Value),
+    WrongTypeRef, // todo: include the context
     OpNotImplemented(tokenizer::Ops),
     ArrayOutOfBounds(i64, usize),
 }
@@ -136,6 +137,7 @@ impl StdError for EvalError {
         match *self {
             EvalError::EmptyStack => "EmptyStack",
             EvalError::WrongType(_) => "Wrongtype",
+            EvalError::WrongTypeRef => "WrongtypeRef",
             EvalError::OpNotImplemented(_) => "OpNotImplemented",
             EvalError::ArrayOutOfBounds(_, _) => "ArrayOutOfBounds",
         }
@@ -205,31 +207,31 @@ fn modi(a: i64, b: i64) -> i64 {
     a - b * divi(a, b)
 }
 
-fn get_integer(v: &Value) -> i64 {
+fn get_integer(v: &Value) -> Result<i64, EvalError> {
     match v {
-        &Value::ValInteger(i) => i,
-        other => panic!("{:?} is not an integer", other),
+        &Value::ValInteger(i) => Ok(i),
+        other => Err(EvalError::WrongTypeRef)
     }
 }
 
-fn get_string<'a>(v: &'a Value) -> &'a String {
+fn get_string(v: &Value) -> Result<&String, EvalError> {
     match v {
-        &Value::ValString(ref i) => &i,
-        other => panic!("{:?} is not an integer", other),
+        &Value::ValString(ref i) => Ok(&i),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
-fn get_real(v: &Value) -> f64 {
+fn get_real(v: &Value) -> Result<f64, EvalError> {
     match v {
-        &Value::ValReal(f) => f,
-        other => panic!("{:?} is not an real", other),
+        &Value::ValReal(f) => Ok(f),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
-fn get_boolean(v: &Value) -> bool {
+fn get_boolean(v: &Value) -> Result<bool, EvalError> {
     match v {
-        &Value::ValBoolean(b) => b,
-        other => panic!("{:?} is not an boolean", other),
+        &Value::ValBoolean(b) => Ok(b),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -239,36 +241,36 @@ fn make_array(s: &Stack) -> Value {
     Value::ValArray(tmp)
 }
 
-fn get_point<'a>(v: &'a Value) -> &'a vecmath::Vec3 {
+fn get_point(v: &Value) -> Result<&vecmath::Vec3, EvalError> {
     match v {
-        &Value::ValPoint(ref p) => &p,
-        other => panic!("{:?} is not a point", other),
+        &Value::ValPoint(ref p) => Ok(&p),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
-fn move_point(v: Value) -> vecmath::Vec3 {
+fn move_point(v: Value) -> Result<vecmath::Vec3, EvalError> {
     match v {
-        Value::ValPoint(p) => p,
-        other => panic!("{:?} is not a point", other),
+        Value::ValPoint(p) => Ok(p),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
-fn get_point_x(v: &Value) -> f64 {
-    get_point(v)[0]
+fn get_point_x(v: &Value) -> Result<f64, EvalError> {
+    Ok(get_point(v)?[0])
 }
 
-fn get_point_y(v: &Value) -> f64 {
-    get_point(v)[1]
+fn get_point_y(v: &Value) -> Result<f64, EvalError> {
+    Ok(get_point(v)?[1])
 }
 
-fn get_point_z(v: &Value) -> f64 {
-    get_point(v)[2]
+fn get_point_z(v: &Value) -> Result<f64, EvalError> {
+    Ok(get_point(v)?[2])
 }
 
-fn move_node(v: Value) -> Box<primitives::Node> {
+fn move_node(v: Value) -> Result<Box<primitives::Node>, EvalError> {
     match v {
-        Value::ValNode(n) => n,
-        _ => panic!("not a node!")
+        Value::ValNode(n) => Ok(n),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -276,7 +278,7 @@ fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
     let c2 = pop(stack)?;
     let c1 = pop(stack)?;
     let pred = pop(stack)?;
-    if get_boolean(&pred) {
+    if get_boolean(&pred)? {
         match c1 {
             Value::ValClosure(mut e, f) => {
                 Ok(do_evaluate(&mut e, stack, &f))
@@ -306,38 +308,38 @@ fn eval_apply(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_addi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    stack.push(Value::ValInteger(get_integer(&i1) + get_integer(&i2)));
+    stack.push(Value::ValInteger(get_integer(&i1)? + get_integer(&i2)?));
     Ok(())
 }
 
 fn eval_addf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r1) + get_real(&r2)));
+    stack.push(Value::ValReal(get_real(&r1)? + get_real(&r2)?));
     Ok(())
 }
 
 fn eval_acos(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r).acos().to_degrees()));
+    stack.push(Value::ValReal(get_real(&r)?.acos().to_degrees()));
     Ok(())
 }
 
 fn eval_asin(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r).asin().to_degrees()));
+    stack.push(Value::ValReal(get_real(&r)?.asin().to_degrees()));
     Ok(())
 }
 
 fn eval_clampf(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r).max(0.0).min(1.0)));
+    stack.push(Value::ValReal(get_real(&r)?.max(0.0).min(1.0)));
     Ok(())
 }
 
 fn eval_cos(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    let mut res = get_real(&r).to_radians().cos();
+    let mut res = get_real(&r)?.to_radians().cos();
     if res.abs() < 1e-15 {
         res = 0.0;
     }
@@ -348,21 +350,21 @@ fn eval_cos(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_divi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    stack.push(Value::ValInteger(get_integer(&i1) / get_integer(&i2)));
+    stack.push(Value::ValInteger(get_integer(&i1)? / get_integer(&i2)?));
     Ok(())
 }
 
 fn eval_divf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r1) / get_real(&r2)));
+    stack.push(Value::ValReal(get_real(&r1)? / get_real(&r2)?));
     Ok(())
 }
 
 fn eval_eqi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    let rv = get_integer(&i1) == get_integer(&i2);
+    let rv = get_integer(&i1)? == get_integer(&i2)?;
     stack.push(Value::ValBoolean(rv));
     Ok(())
 }
@@ -370,27 +372,27 @@ fn eval_eqi(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_eqf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
-    let rv = get_real(&r1) == get_real(&r2);
+    let rv = get_real(&r1)? == get_real(&r2)?;
     stack.push(Value::ValBoolean(rv));
     Ok(())
 }
 
 fn eval_floor(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValInteger(get_real(&r).floor() as i64));
+    stack.push(Value::ValInteger(get_real(&r)?.floor() as i64));
     Ok(())
 }
 
 fn eval_frac(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r).fract()));
+    stack.push(Value::ValReal(get_real(&r)?.fract()));
     Ok(())
 }
 
 fn eval_lessi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    if get_integer(&i1) < get_integer(&i2) {
+    if get_integer(&i1)? < get_integer(&i2)? {
         stack.push(Value::ValBoolean(true));
     } else {
         stack.push(Value::ValBoolean(false));
@@ -401,7 +403,7 @@ fn eval_lessi(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_lessf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
-    if get_real(&r1) < get_real(&r2) {
+    if get_real(&r1)? < get_real(&r2)? {
         stack.push(Value::ValBoolean(true));
     } else {
         stack.push(Value::ValBoolean(false));
@@ -412,45 +414,45 @@ fn eval_lessf(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_modi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    stack.push(Value::ValInteger(modi(get_integer(&i1), get_integer(&i2))));
+    stack.push(Value::ValInteger(modi(get_integer(&i1)?, get_integer(&i2)?)));
     Ok(())
 }
 
 fn eval_muli(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    stack.push(Value::ValInteger(get_integer(&i1) * get_integer(&i2)));
+    stack.push(Value::ValInteger(get_integer(&i1)? * get_integer(&i2)?));
     Ok(())
 }
 
 fn eval_mulf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r1) * get_real(&r2)));
+    stack.push(Value::ValReal(get_real(&r1)? * get_real(&r2)?));
     Ok(())
 }
 
 fn eval_negi(stack: &mut Stack) -> Result<(), EvalError> {
     let i = pop(stack)?;
-    stack.push(Value::ValInteger(-get_integer(&i)));
+    stack.push(Value::ValInteger(get_integer(&i)?));
     Ok(())
 }
 
 fn eval_negf(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValReal(-get_real(&r)));
+    stack.push(Value::ValReal(get_real(&r)?));
     Ok(())
 }
 
 fn eval_real(stack: &mut Stack) -> Result<(), EvalError> {
     let i = pop(stack)?;
-    stack.push(Value::ValReal(get_integer(&i) as f64));
+    stack.push(Value::ValReal(get_integer(&i)? as f64));
     Ok(())
 }
 
 fn eval_sin(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    let mut res = get_real(&r).to_radians().sin();
+    let mut res = get_real(&r)?.to_radians().sin();
     if res.abs() < 1e-15 {
         res = 0.0;
     }
@@ -460,21 +462,21 @@ fn eval_sin(stack: &mut Stack) -> Result<(), EvalError> {
 
 fn eval_sqrt(stack: &mut Stack) -> Result<(), EvalError> {
     let r = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r).sqrt()));
+    stack.push(Value::ValReal(get_real(&r)?.sqrt()));
     Ok(())
 }
 
 fn eval_subi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    stack.push(Value::ValInteger(get_integer(&i1) - get_integer(&i2)));
+    stack.push(Value::ValInteger(get_integer(&i1)? - get_integer(&i2)?));
     Ok(())
 }
 
 fn eval_subf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
-    stack.push(Value::ValReal(get_real(&r1) - get_real(&r2)));
+    stack.push(Value::ValReal(get_real(&r1)? - get_real(&r2)?));
     Ok(())
 }
 
@@ -482,52 +484,52 @@ fn eval_point(stack: &mut Stack) -> Result<(), EvalError> {
     let z = pop(stack)?;
     let y = pop(stack)?;
     let x = pop(stack)?;
-    stack.push(Value::ValPoint([get_real(&x), get_real(&y), get_real(&z)]));
+    stack.push(Value::ValPoint([get_real(&x)?, get_real(&y)?, get_real(&z)?]));
     Ok(())
 }
 
 fn eval_getx(stack: &mut Stack) -> Result<(), EvalError> {
     let p = pop(stack)?;
-    stack.push(Value::ValReal(get_point_x(&p)));
+    stack.push(Value::ValReal(get_point_x(&p)?));
     Ok(())
 }
 
 fn eval_gety(stack: &mut Stack) -> Result<(), EvalError> {
     let p = pop(stack)?;
-    stack.push(Value::ValReal(get_point_y(&p)));
+    stack.push(Value::ValReal(get_point_y(&p)?));
     Ok(())
 }
 
 fn eval_getz(stack: &mut Stack) -> Result<(), EvalError> {
     let p = pop(stack)?;
-    stack.push(Value::ValReal(get_point_z(&p)));
+    stack.push(Value::ValReal(get_point_z(&p)?));
     Ok(())
 }
 
-fn get_array(v: &Value) -> &Vec<Value> {
+fn get_array(v: &Value) -> Result<&Vec<Value>, EvalError> {
     match v {
-        &Value::ValArray(ref a) => a,
-        other => panic!("{:?} is not an array", other),
+        &Value::ValArray(ref a) => Ok(a),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
-fn move_lights(v: Value) -> Vec<Box<lights::Light>> {
+fn move_lights(v: Value) -> Result<Vec<Box<lights::Light>>, EvalError> {
     match v {
         Value::ValArray(a) => {
             a.into_iter().map(|v| match v {
-                Value::ValLight(light) => light,
-                _ => panic!("array must be lights only!")
+                Value::ValLight(light) => Ok(light),
+                other => Err(EvalError::WrongTypeRef)
             }).collect()
         }
-        other => panic!("{:?} is not an array", other),
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn eval_get(stack: &mut Stack) -> Result<(), EvalError> {
     let i = pop(stack)?;
     let a = pop(stack)?;
-    let iv = get_integer(&i);
-    let av = get_array(&a);
+    let iv = get_integer(&i)?;
+    let av = get_array(&a)?;
     if iv < 0 || iv > av.len() as i64 {
         return Err(EvalError::ArrayOutOfBounds(iv, av.len()));
     }
@@ -538,58 +540,58 @@ fn eval_get(stack: &mut Stack) -> Result<(), EvalError> {
 
 fn eval_length(stack: &mut Stack) -> Result<(), EvalError> {
     let a = pop(stack)?;
-    stack.push(Value::ValInteger(get_array(&a).len() as i64));
+    stack.push(Value::ValInteger(get_array(&a)?.len() as i64));
     Ok(())
 }
 
 fn eval_sphere(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(move_surface(surface)))));
+    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(move_surface(surface)?))));
     Ok(())
 }
 
 fn eval_union(stack: &mut Stack) -> Result<(), EvalError> {
     let obj2 = pop(stack)?;
     let obj1 = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Operator::make_union(move_node(obj1), move_node(obj2)))));
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_union(move_node(obj1)?, move_node(obj2)?))));
     Ok(())
 }
 
 fn eval_intersect(stack: &mut Stack) -> Result<(), EvalError> {
     let obj2 = pop(stack)?;
     let obj1 = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Operator::make_intersect(move_node(obj1), move_node(obj2)))));
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_intersect(move_node(obj1)?, move_node(obj2)?))));
     Ok(())
 }
 
 fn eval_difference(stack: &mut Stack) -> Result<(), EvalError> {
     let obj2 = pop(stack)?;
     let obj1 = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Operator::make_difference(move_node(obj1), move_node(obj2)))));
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_difference(move_node(obj1)?, move_node(obj2)?))));
     Ok(())
 }
 
 fn eval_cube(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Cube::new(move_surface(surface)))));
+    stack.push(Value::ValNode(Box::new(primitives::Cube::new(move_surface(surface)?))));
     Ok(())
 }
 
 fn eval_cylinder(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Cylinder::new(move_surface(surface)))));
+    stack.push(Value::ValNode(Box::new(primitives::Cylinder::new(move_surface(surface)?))));
     Ok(())
 }
 
 fn eval_cone(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Cone::new(move_surface(surface)))));
+    stack.push(Value::ValNode(Box::new(primitives::Cone::new(move_surface(surface)?))));
     Ok(())
 }
 
 fn eval_plane(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Plane::new(move_surface(surface)))));
+    stack.push(Value::ValNode(Box::new(primitives::Plane::new(move_surface(surface)?))));
     Ok(())
 }
 
@@ -600,7 +602,7 @@ fn eval_translate(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     match obj {
         Value::ValNode(mut node) => {
-            node.translate(get_real(&tx), get_real(&ty), get_real(&tz));
+            node.translate(get_real(&tx)?, get_real(&ty)?, get_real(&tz)?);
             stack.push(Value::ValNode(node));
             Ok(())
         },
@@ -615,7 +617,7 @@ fn eval_scale(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     match obj {
         Value::ValNode(mut node) => {
-            node.scale(get_real(&sx), get_real(&sy), get_real(&sz));
+            node.scale(get_real(&sx)?, get_real(&sy)?, get_real(&sz)?);
             stack.push(Value::ValNode(node));
             Ok(())
         },
@@ -628,7 +630,7 @@ fn eval_uscale(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     match obj {
         Value::ValNode(mut node) => {
-            node.uscale(get_real(&s));
+            node.uscale(get_real(&s)?);
             stack.push(Value::ValNode(node));
             Ok(())
         },
@@ -641,7 +643,7 @@ fn eval_rotatex(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     match obj {
         Value::ValNode(mut node) => {
-            node.rotatex(get_real(&d));
+            node.rotatex(get_real(&d)?);
             stack.push(Value::ValNode(node));
             Ok(())
         },
@@ -654,7 +656,7 @@ fn eval_rotatey(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     match obj {
         Value::ValNode(mut node) => {
-            node.rotatey(get_real(&d));
+            node.rotatey(get_real(&d)?);
             stack.push(Value::ValNode(node));
             Ok(())
         },
@@ -667,7 +669,7 @@ fn eval_rotatez(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     match obj {
         Value::ValNode(mut node) => {
-            node.rotatez(get_real(&d));
+            node.rotatez(get_real(&d)?);
             stack.push(Value::ValNode(node));
             Ok(())
         },
@@ -678,16 +680,16 @@ fn eval_rotatez(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_light(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let d = pop(stack)?;
-    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(move_point(d),
-                                                                      move_point(color)))));
+    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(move_point(d)?,
+                                                                      move_point(color)?))));
     Ok(())
 }
 
 fn eval_pointlight(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let p = pop(stack)?;
-    stack.push(Value::ValLight(Box::new(lights::PointLight::new(move_point(p),
-                                                                move_point(color)))));
+    stack.push(Value::ValLight(Box::new(lights::PointLight::new(move_point(p)?,
+                                                                move_point(color)?))));
     Ok(())
 }
 
@@ -697,11 +699,11 @@ fn eval_spotlight(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let at = pop(stack)?;
     let pos = pop(stack)?;
-    stack.push(Value::ValLight(Box::new(lights::SpotLight::new(move_point(pos),
-                                                               move_point(at),
-                                                               move_point(color),
-                                                               get_real(&cutoff),
-                                                               get_real(&exp)))));
+    stack.push(Value::ValLight(Box::new(lights::SpotLight::new(move_point(pos)?,
+                                                               move_point(at)?,
+                                                               move_point(color)?,
+                                                               get_real(&cutoff)?,
+                                                               get_real(&exp)?))));
     Ok(())
 }
 
@@ -714,22 +716,22 @@ fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     let lights = pop(stack)?;
     let amb = pop(stack)?;
-    raytracer::render(move_point(amb),
-                      move_lights(lights),
-                      move_node(obj),
-                      get_integer(&depth),
-                      get_real(&fov),
-                      get_integer(&wid),
-                      get_integer(&ht),
-                      get_string(&file));
+    raytracer::render(move_point(amb)?,
+                      move_lights(lights)?,
+                      move_node(obj)?,
+                      get_integer(&depth)?,
+                      get_real(&fov)?,
+                      get_integer(&wid)?,
+                      get_integer(&ht)?,
+                      get_string(&file)?);
     Ok(())
 }
 
 // Let's move into here, to avoid one clone
-fn move_surface(v: Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>> {
+fn move_surface(v: Value) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>>, EvalError> {
     match v {
         Value::ValClosure(env, ast) => {
-            Rc::new(Box::new(move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
+            Ok(Rc::new(Box::new(move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
                 let mut mutable_local_env = env.clone();
                 let mut stack = Stack::new();
                 stack.push(Value::ValInteger(face));
@@ -740,10 +742,13 @@ fn move_surface(v: Value) -> Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f6
                 let ks = stack.pop().expect("empty stack");
                 let kd = stack.pop().expect("empty stack");
                 let sc = stack.pop().expect("empty stack");
-                (move_point(sc), get_real(&kd), get_real(&ks), get_real(&n))
-            }))
+                let rkd = get_real(&kd).expect("not a real");
+                let rks = get_real(&ks).expect("not a real");
+                let rn = get_real(&n).expect("not a real");
+                (move_point(sc).expect("wrong type"), rkd, rks, rn)
+            })))
         }
-        _ => panic!("not a closure")
+        other => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -813,7 +818,7 @@ mod tests {
     fn test_bind_string() {
         let (env, _) = run(r#""apa" /x"#);
         assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
-        assert_eq!(*get_string(env.get("x").unwrap()), "apa".to_string());
+        assert_eq!(*get_string(env.get("x").unwrap()).unwrap(), "apa".to_string());
     }
 
     #[test]
@@ -935,7 +940,7 @@ mod tests {
                 let expected = test(u / 10.0, v / 10.0);
                 let (_, stack) = run(prog.as_ref());
                 assert_eq!(stack.len(), 1);
-                assert_eq!(get_integer(&stack[0]), expected);
+                assert_eq!(get_integer(&stack[0]).unwrap(), expected);
             }
         }
     }

@@ -819,94 +819,94 @@ mod tests {
 
     #[test]
     fn test_bind_integer() {
-        let (env, _) = run("1 /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(1));
+        let (env, _) = run("1 /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValInteger(1));
     }
 
     #[test]
     fn test_bind_string() {
-        let (env, _) = run(r#""apa" /x"#).unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
-        assert_eq!(*get_string(env.get("x").unwrap()).unwrap(), "apa".to_string());
+        let (env, _) = run(r#""apa" /x"#).expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValString("apa".to_string()));
+        assert_eq!(*get_string(env.get("x").expect("error")).expect("error"), "apa".to_string());
     }
 
     #[test]
     fn test_addi() {
-        let (_, stack) = run("1 2 addi").unwrap();
+        let (_, stack) = run("1 2 addi").expect("error");
         assert_eq!(stack, vec![Value::ValInteger(3)]);
     }
 
     #[test]
     fn test_addf() {
-        let (_, stack) = run("1.5 2.5 addf").unwrap();
+        let (_, stack) = run("1.5 2.5 addf").expect("error");
         assert_eq!(stack, vec![Value::ValReal(4.0)]);
     }
 
     #[test]
     fn test_ref() {
-        let (_, stack) = run("1 /x x x addi").unwrap();
+        let (_, stack) = run("1 /x x x addi").expect("error");
         assert_eq!(stack, vec![Value::ValInteger(2)]);
     }
 
     #[test]
     fn test_apply() {
-        let (_, stack) = run("1 { /x x x } apply").unwrap();
+        let (_, stack) = run("1 { /x x x } apply").expect("error");
         assert_eq!(stack, vec![Value::ValInteger(1), Value::ValInteger(1)]);
     }
 
     #[test]
     fn test_if() {
-        let (_, stack) = run("true { 1 } { 2 } if").unwrap();
+        let (_, stack) = run("true { 1 } { 2 } if").expect("error");
         assert_eq!(stack, vec![Value::ValInteger(1)]);
-        let (_, stack) = run("false { 1 } { 2 } if").unwrap();
+        let (_, stack) = run("false { 1 } { 2 } if").expect("error");
         assert_eq!(stack, vec![Value::ValInteger(2)]);
     }
 
     #[test]
     fn test_eqi() {
-        let (_, stack) = run("1 2 eqi").unwrap();
+        let (_, stack) = run("1 2 eqi").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("5 5 eqi").unwrap();
+        let (_, stack) = run("5 5 eqi").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_eqf() {
-        let (_, stack) = run("1.5 2.7 eqf").unwrap();
+        let (_, stack) = run("1.5 2.7 eqf").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("5.123 5.123 eqf").unwrap();
+        let (_, stack) = run("5.123 5.123 eqf").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_lessi() {
-        let (_, stack) = run("2 1 lessi").unwrap();
+        let (_, stack) = run("2 1 lessi").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("2 2 lessi").unwrap();
+        let (_, stack) = run("2 2 lessi").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("1 2 lessi").unwrap();
+        let (_, stack) = run("1 2 lessi").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_lessf() {
-        let (_, stack) = run("2.0 1.0 lessf").unwrap();
+        let (_, stack) = run("2.0 1.0 lessf").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("2.0 2.0 lessf").unwrap();
+        let (_, stack) = run("2.0 2.0 lessf").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("1.0 2.0 lessf").unwrap();
+        let (_, stack) = run("1.0 2.0 lessf").expect("error");
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_successful_run() {
-        run("false /b b { 1 } { 2 } if").unwrap();
-        run("4 /x 2 x addi").unwrap();
-        run("1 { /x x x } apply addi").unwrap();
-        run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply").unwrap();
-        run("{ /x /y x y } /swap 3 4 swap apply").unwrap();
+        run("false /b b { 1 } { 2 } if").expect("error");
+        run("4 /x 2 x addi").expect("error");
+        run("1 { /x x x } apply addi").expect("error");
+        run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply").expect("error");
+        run("{ /x /y x y } /swap 3 4 swap apply").expect("error");
         run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact \
-             apply").unwrap();
+             apply").expect("error");
     }
 
     #[test]
@@ -947,49 +947,49 @@ mod tests {
                 }
                 // Compare results (which should be the only thing om the top of the stack)
                 let expected = test(u / 10.0, v / 10.0);
-                let (_, stack) = run(prog.as_ref()).unwrap();
+                let (_, stack) = run(prog.as_ref()).expect("error");
                 assert_eq!(stack.len(), 1);
-                assert_eq!(get_integer(&stack[0]).unwrap(), expected);
+                assert_eq!(get_integer(&stack[0]).expect("error"), expected);
             }
         }
     }
 
     #[test]
     fn test_clampf() {
-        let (env, _) = run("-0.4 clampf /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.0));
-        let (env, _) = run("1.1 clampf /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
-        let (env, _) = run("0.8 clampf /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.8));
+        let (env, _) = run("-0.4 clampf /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValReal(0.0));
+        let (env, _) = run("1.1 clampf /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValReal(1.0));
+        let (env, _) = run("0.8 clampf /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValReal(0.8));
     }
 
     #[test]
     fn test_array() {
-        let (env, _) = run("[1 2 3] length /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
-        let (env, _) = run("[1 2 3] 1 get /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
-        let (env, _) = run("[0 1 2 3 4 5 6 7 8 9] /a a 0 get /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValInteger(0));
+        let (env, _) = run("[1 2 3] length /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValInteger(3));
+        let (env, _) = run("[1 2 3] 1 get /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValInteger(2));
+        let (env, _) = run("[0 1 2 3 4 5 6 7 8 9] /a a 0 get /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValInteger(0));
     }
 
     #[test]
     fn test_point() {
-        let (env, _) = run("1.0 2.0 3.0 point /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValPoint([1.0, 2.0, 3.0]));
-        let (env, _) = run("1.0 2.0 3.0 point getx /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
-        let (env, _) = run("1.0 2.0 3.0 point gety /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValReal(2.0));
-        let (env, _) = run("1.0 2.0 3.0 point getz /x").unwrap();
-        assert_eq!(env.get("x").unwrap(), &Value::ValReal(3.0));
+        let (env, _) = run("1.0 2.0 3.0 point /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValPoint([1.0, 2.0, 3.0]));
+        let (env, _) = run("1.0 2.0 3.0 point getx /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValReal(1.0));
+        let (env, _) = run("1.0 2.0 3.0 point gety /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValReal(2.0));
+        let (env, _) = run("1.0 2.0 3.0 point getz /x").expect("error");
+        assert_eq!(env.get("x").expect("error"), &Value::ValReal(3.0));
     }
 
     #[test]
     fn test_sphere() {
-        let (env, _) = run("1.0 { /x x } sphere /x").unwrap();
-        match env.get("x").unwrap() {
+        let (env, _) = run("1.0 { /x x } sphere /x").expect("error");
+        match env.get("x").expect("error") {
             &Value::ValNode(ref x) => assert!(true),
             _ => assert!(false),
         }
@@ -997,8 +997,8 @@ mod tests {
 
     #[test]
     fn test_light() {
-        let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x").unwrap();
-        match env.get("x").unwrap() {
+        let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x").expect("error");
+        match env.get("x").expect("error") {
             &Value::ValLight(ref x) => {
                 assert_eq!(x.get_direction([1.0, 1.0, 1.0]), ([-1.0, 0.0, 0.0], None));
                 assert_eq!(x.get_intensity([1.0, 1.0, 1.0]), [0.7, 0.5, 0.3]);
@@ -1009,6 +1009,6 @@ mod tests {
 
     #[test]
     fn test_render() {
-        let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /v /u /face 0.8 0.2 v point 1.0 0.2 1.0 } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#).unwrap();
+        let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /v /u /face 0.8 0.2 v point 1.0 0.2 1.0 } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#).expect("error");
     }
 }

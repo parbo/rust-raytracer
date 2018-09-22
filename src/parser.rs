@@ -100,13 +100,13 @@ fn test_parser() {
     assert_eq!(parse(&[tokenizer::Token::BeginArray,
                        tokenizer::Token::Integer(1),
                        tokenizer::Token::Integer(2),
-                       tokenizer::Token::EndArray]).unwrap(),
+                       tokenizer::Token::EndArray]).expect("error"),
                [AstNode::Array(vec![AstNode::Leaf(tokenizer::Token::Integer(1)),
                                     AstNode::Leaf(tokenizer::Token::Integer(2))])]);
     assert_eq!(parse(&[tokenizer::Token::BeginFunction,
                        tokenizer::Token::Integer(1),
                        tokenizer::Token::Integer(2),
-                       tokenizer::Token::EndFunction]).unwrap(),
+                       tokenizer::Token::EndFunction]).expect("error"),
                [AstNode::Function(vec![AstNode::Leaf(tokenizer::Token::Integer(1)),
                                        AstNode::Leaf(tokenizer::Token::Integer(2))])]);
     assert_eq!(parse(&[tokenizer::Token::BeginFunction,
@@ -115,7 +115,7 @@ fn test_parser() {
                        tokenizer::Token::Integer(2),
                        tokenizer::Token::Integer(3),
                        tokenizer::Token::EndArray,
-                       tokenizer::Token::EndFunction]).unwrap(),
+                       tokenizer::Token::EndFunction]).expect("error"),
                [AstNode::Function(vec![AstNode::Leaf(tokenizer::Token::Integer(1)),
                                        AstNode::Array(vec![AstNode::Leaf(tokenizer::Token::Integer(2)),
                                                            AstNode::Leaf(tokenizer::Token::Integer(3))])])]);

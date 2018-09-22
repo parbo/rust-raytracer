@@ -277,7 +277,7 @@ impl IntersectRay for Operator {
             .chain(obj2i.iter()
                    .zip(iter::repeat(2)))
             .collect();
-        intersections.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        intersections.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Less));
 
         let mut res = Vec::<Intersection>::new();
         let mut prevt = 0.0;
@@ -787,7 +787,7 @@ impl IntersectRay for Cone {
             // there must be an intersection in the base
             let tp = (-py + 1.0) / dy;
             ts.push((tp, 1));
-            ts.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            ts.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Less));
             let mut tr = vec![];
             if ts[0].0 > 0.0 {
                 tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.0.id, IntersectionType::Entry, ts[0].1));

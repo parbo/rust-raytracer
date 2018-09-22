@@ -5,11 +5,33 @@ use std::cmp::Ordering;
 use std::mem;
 use std::iter;
 use std::sync::atomic::{self, AtomicUsize};
+use std::error::Error as StdError;
+use std::fmt;
+use std::fmt::Debug;
 
 static PRIMITIVE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
 
 #[derive(Debug, PartialEq, Copy)]
 pub struct PrimitiveId(usize);
+
+#[derive(Debug)]
+pub enum PrimitivesError {
+    InvalidFace(i64),
+}
+
+impl fmt::Display for PrimitivesError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        return f.write_str(self.description());
+    }
+}
+
+impl StdError for PrimitivesError {
+    fn description(&self) -> &str {
+        match *self {
+            PrimitivesError::InvalidFace(_) => "InvalidFace",
+        }
+    }
+}
 
 impl PrimitiveId {
     fn new() -> Self {
@@ -24,8 +46,8 @@ impl Clone for PrimitiveId {
 }
 
 pub trait Primitive {
-    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64);
-    fn get_normal(&self, p: Vec3, face: i64) -> Vec3;
+    fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError>;
+    fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError>;
     fn get_transform<'a>(&'a self) -> &'a Transform;
     fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform;
     fn transform_point(&self, p: Vec3) -> Vec3 {
@@ -370,15 +392,23 @@ impl IntersectRay for Sphere {
 }
 
 impl Primitive for Sphere {
-    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+    fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError> {
         let [x, y, z] = opos;
         let v = (y + 1.0) / 2.0;
         let u = x.atan2(z);
-        (self.0.surface)(face, u, v)
+        if face == 0 {
+            Ok((self.0.surface)(face, u, v))
+        } else {
+            Err(PrimitivesError::InvalidFace(face))
+        }
     }
 
-    fn get_normal(&self, p: Vec3, _face: i64) -> Vec3 {
-        normalize(self.0.transform.transform_normal(p))
+    fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
+        if face == 0 {
+            Ok(normalize(self.0.transform.transform_normal(p)))
+        } else {
+            Err(PrimitivesError::InvalidFace(face))
+        }
     }
 
     fn get_transform<'a>(&'a self) -> &'a Transform {
@@ -471,20 +501,25 @@ impl IntersectRay for Cube {
 }
 
 impl Primitive for Cube {
-    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+    fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError> {
         let [x, y, z] = opos;
         match face {
-            0 => (self.0.surface)(0, x, y),
-            1 => (self.0.surface)(1, x, y),
-            2 => (self.0.surface)(2, z, y),
-            3 => (self.0.surface)(3, z, y),
-            4 => (self.0.surface)(4, x, z),
-            5 => (self.0.surface)(5, x, z),
-            _ => panic!("unexpected face")
+            0 => Ok((self.0.surface)(0, x, y)),
+            1 => Ok((self.0.surface)(1, x, y)),
+            2 => Ok((self.0.surface)(2, z, y)),
+            3 => Ok((self.0.surface)(3, z, y)),
+            4 => Ok((self.0.surface)(4, x, z)),
+            5 => Ok((self.0.surface)(5, x, z)),
+            _ => Err(PrimitivesError::InvalidFace(face)),
         }
     }
-    fn get_normal(&self, _p: Vec3, face: i64) -> Vec3 {
-        normalize(self.0.transform.transform_normal(NORMALS[face as usize]))
+
+    fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
+        if face >= 0 && (face as usize) < NORMALS.len() {
+            Ok(normalize(self.0.transform.transform_normal(NORMALS[face as usize])))
+        } else {
+            Err(PrimitivesError::InvalidFace(face))
+        }
     }
 
     fn get_transform<'a>(&'a self) -> &'a Transform {
@@ -627,23 +662,23 @@ impl IntersectRay for Cylinder {
 }
 
 impl Primitive for Cylinder {
-    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+    fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError> {
         let [x, y, z] = opos;
         match face {
-            0 => (self.0.surface)(0, x.atan2(z), y),
-            1 => (self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
-            2 => (self.0.surface)(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
-            _ => panic!("invalid face")
+            0 => Ok((self.0.surface)(0, x.atan2(z), y)),
+            1 => Ok((self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0)),
+            2 => Ok((self.0.surface)(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0)),
+            face => Err(PrimitivesError::InvalidFace(face))
         }
     }
-    fn get_normal(&self, p: Vec3, face: i64) -> Vec3 {
+    fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
         let n = match face {
-            0 => [p[0], 0.0, p[2]],
-            1 => [0.0, 1.0, 0.0],
-            2 => [0.0, -1.0, 0.0],
-            _ => panic!("invalid face")
+            0 => Ok([p[0], 0.0, p[2]]),
+            1 => Ok([0.0, 1.0, 0.0]),
+            2 => Ok([0.0, -1.0, 0.0]),
+            _ => Err(PrimitivesError::InvalidFace(face)),
         };
-        normalize(self.0.transform.transform_normal(n))
+        Ok(normalize(self.0.transform.transform_normal(n?)))
     }
 
     fn get_transform<'a>(&'a self) -> &'a Transform {
@@ -756,22 +791,22 @@ impl IntersectRay for Cone {
 }
 
 impl Primitive for Cone {
-    fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
+    fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError> {
         let [x, y, z] = opos;
         match face {
-            0 => (self.0.surface)(0, x.atan2(z), y),
-            1 => (self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
-            _ => panic!("invalid face")
+            0 => Ok((self.0.surface)(0, x.atan2(z), y)),
+            1 => Ok((self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0)),
+            face => Err(PrimitivesError::InvalidFace(face)),
         }
     }
 
-    fn get_normal(&self, p: Vec3, face: i64) -> Vec3 {
+    fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
         let n = match face {
-            0 => [p[0], -p[1], p[2]],
-            1 => [0.0, 1.0, 0.0],
-            _ => panic!("invalid face")
+            0 => Ok([p[0], -p[1], p[2]]),
+            1 => Ok([0.0, 1.0, 0.0]),
+            _ => Err(PrimitivesError::InvalidFace(face)),
         };
-        normalize(self.0.transform.transform_normal(n))
+        Ok(normalize(self.0.transform.transform_normal(n?)))
     }
 
     fn get_transform<'a>(&'a self) -> &'a Transform {
@@ -828,13 +863,21 @@ impl IntersectRay for Plane {
 }
 
 impl Primitive for Plane {
-    fn get_surface(&self, opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
+    fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError> {
         let [x, _y, z] = opos;
-        (self.0.surface)(0, x, z)
+        if face == 0 {
+            Ok((self.0.surface)(0, x, z))
+        } else {
+            Err(PrimitivesError::InvalidFace(face))
+        }
     }
 
-    fn get_normal(&self, _p: Vec3, _face: i64) -> Vec3 {
-        normalize(self.0.transform.transform_normal([0.0, 1.0, 0.0]))
+    fn get_normal(&self, _p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
+        if face == 0 {
+            Ok(normalize(self.0.transform.transform_normal([0.0, 1.0, 0.0])))
+        } else {
+            Err(PrimitivesError::InvalidFace(face))
+        }
     }
 
     fn get_transform<'a>(&'a self) -> &'a Transform {

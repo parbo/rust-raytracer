@@ -55,12 +55,12 @@ fn trace(amb: Vec3,
         }
         let primitive = scene.find_primitive(isect.primitive_id).unwrap();
         let opos = isect.get_opos();
-        let (sc, kd, ks, n) = primitive.get_surface(opos, isect.face);
+        let (sc, kd, ks, n) = primitive.get_surface(opos, isect.face).unwrap();
         let mut c = get_ambient(sc, amb, kd);
         let mut diffuse = [0.0, 0.0, 0.0];
         let mut specular = [0.0, 0.0, 0.0];
         let pos = primitive.transform_point(opos);
-        let mut normal = primitive.get_normal(opos, isect.face);
+        let mut normal = primitive.get_normal(opos, isect.face).unwrap();
         if isect.switched() {
             normal = neg(normal);
         }

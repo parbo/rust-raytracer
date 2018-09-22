@@ -6,38 +6,45 @@ use std::mem;
 use std::iter;
 use std::sync::atomic::{self, AtomicUsize};
 
-static NODE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+static PRIMITIVE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
 
 #[derive(Debug, PartialEq, Copy)]
-pub struct NodeId(usize);
+pub struct PrimitiveId(usize);
 
-impl NodeId {
+impl PrimitiveId {
     fn new() -> Self {
-        NodeId(NODE_COUNTER.fetch_add(1, atomic::Ordering::SeqCst))
+        PrimitiveId(PRIMITIVE_COUNTER.fetch_add(1, atomic::Ordering::SeqCst))
     }
 }
 
-impl Clone for NodeId {
-    fn clone(&self) -> NodeId {
-        NodeId::new()
+impl Clone for PrimitiveId {
+    fn clone(&self) -> PrimitiveId {
+        PrimitiveId::new()
     }
 }
 
-pub trait Node: NodeClone {
-    fn name(&self) -> &str;
-    fn id(&self) -> NodeId;
-    fn find_node(&self, id: NodeId) -> Option<&Node>;
-    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
-    fn inside(&self, pos: Vec3) -> bool;
+pub trait Primitive {
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64);
+    fn get_normal(&self, p: Vec3, face: i64) -> Vec3;
+    fn get_transform<'a>(&'a self) -> &'a Transform;
+    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform;
+    fn transform_point(&self, p: Vec3) -> Vec3 {
+        self.get_transform().transform_point(p)
+    }
+}
+
+pub trait IntersectRay {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive>;
+    fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
+}
+
+pub trait Node: NodeClone + IntersectRay {
     fn translate(&mut self, tx: f64, ty: f64, tz: f64);
     fn scale(&mut self, sx: f64, sy: f64, sz: f64);
     fn uscale(&mut self, s: f64);
     fn rotatex(&mut self, d: f64);
     fn rotatey(&mut self, d: f64);
     fn rotatez(&mut self, d: f64);
-    fn transform_point(&self, p: Vec3) -> Vec3;
-    fn get_normal(&self, p: Vec3, face: i64) -> Vec3;
 }
 
 pub trait NodeClone {
@@ -58,6 +65,27 @@ impl Clone for Box<Node> {
     }
 }
 
+impl<T: Primitive + IntersectRay + Clone + 'static> Node for T {
+    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
+        self.get_mut_transform().translate(tx, ty, tz);
+    }
+    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
+        self.get_mut_transform().scale(sx, sy, sz);
+    }
+    fn uscale(&mut self, s: f64) {
+        self.get_mut_transform().uscale(s);
+    }
+    fn rotatex(&mut self, d: f64) {
+        self.get_mut_transform().rotatex(d);
+    }
+    fn rotatey(&mut self, d: f64) {
+        self.get_mut_transform().rotatey(d);
+    }
+    fn rotatez(&mut self, d: f64) {
+        self.get_mut_transform().rotatez(d);
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IntersectionType {
     Entry,
@@ -71,7 +99,7 @@ pub struct Intersection {
     pub distance: f64,
     rp: Vec3,
     rd: Vec3,
-    pub primitive_id: NodeId,
+    pub primitive_id: PrimitiveId,
     pub t: IntersectionType,
     pub original_t: IntersectionType,
     pub face: i64  // Todo: maybe use a type instea
@@ -95,7 +123,7 @@ impl Intersection {
         odistance: f64,
         rp: Vec3,
         rd: Vec3,
-        primitive_id: NodeId,
+        primitive_id: PrimitiveId,
         t: IntersectionType,
         face: i64
     ) -> Intersection {
@@ -131,8 +159,6 @@ pub struct Operator {
     obj1: Box<Node>,
     obj2: Box<Node>,
     rule: &'static Fn(bool, bool) -> bool,
-    name: &'static str,
-    id: NodeId
 }
 
 fn union(a: bool, b: bool) -> bool {
@@ -153,8 +179,6 @@ impl Operator {
             obj1: obj1,
             obj2: obj2,
             rule: &union,
-            name: "union",
-            id: NodeId::new()
         }
     }
     pub fn make_intersect(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
@@ -162,8 +186,6 @@ impl Operator {
             obj1: obj1,
             obj2: obj2,
             rule: &intersect,
-            name: "intersect",
-            id: NodeId::new()
         }
     }
     pub fn make_difference(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
@@ -171,34 +193,11 @@ impl Operator {
             obj1: obj1,
             obj2: obj2,
             rule: &difference,
-            name: "difference",
-            id: NodeId::new()
         }
     }
 }
 
 impl Node for Operator {
-    fn name(&self) -> &str {
-        self.name
-    }
-    fn id(&self) -> NodeId {
-        self.id
-    }
-    fn find_node(&self, id: NodeId) -> Option<&Node> {
-        if let Some(n) = self.obj1.find_node(id) {
-            Some(n)
-        } else if let Some(n) = self.obj2.find_node(id) {
-            Some(n)
-        } else {
-            None
-        }
-    }
-    fn inside(&self, pos: Vec3) -> bool {
-        (self.rule)(self.obj1.inside(pos), self.obj2.inside(pos))
-    }
-    fn get_surface(&self, _opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
-        panic!("this should not happen");
-    }
     fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
         self.obj1.translate(tx, ty, tz);
         self.obj2.translate(tx, ty, tz);
@@ -223,15 +222,21 @@ impl Node for Operator {
         self.obj1.rotatez(d);
         self.obj2.rotatez(d);
     }
+}
 
-    fn transform_point(&self, _p: Vec3) -> Vec3 {
-        panic!("this should not happen");
+impl IntersectRay for Operator {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+        if let Some(n) = self.obj1.find_primitive(id) {
+            Some(n)
+        } else if let Some(n) = self.obj2.find_primitive(id) {
+            Some(n)
+        } else {
+            None
+        }
     }
-
-    fn get_normal(&self, _p: Vec3, _face: i64) -> Vec3 {
-        panic!("this should not happen");
-    }
-
+    // fn inside(&self, pos: Vec3) -> bool {
+    //     (self.rule)(self.obj1.inside(pos), self.obj2.inside(pos))
+    // }
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
         let mut inside1 = 0;
         let mut inside2 = 0;
@@ -298,29 +303,30 @@ impl Node for Operator {
 }
 
 #[derive(Clone)]
-pub struct Sphere {
+pub struct PrimitiveCommon {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
+    id: PrimitiveId
 }
+
+#[derive(Clone)]
+pub struct Sphere(PrimitiveCommon);
 
 impl Sphere {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
-        Sphere { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Sphere(
+            PrimitiveCommon {
+                transform: Default::default(),
+                surface: surface,
+                id: PrimitiveId::new()
+            }
+        )
     }
 }
 
-impl Node for Sphere {
-    fn name(&self) -> &str {
-        return "sphere";
-    }
-
-    fn id(&self) -> NodeId {
-        self.id
-    }
-
-    fn find_node(&self, id: NodeId) -> Option<&Node> {
-        if id == self.id {
+impl IntersectRay for Sphere {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+        if id == self.0.id {
             Some(self)
         } else {
             None
@@ -328,7 +334,7 @@ impl Node for Sphere {
     }
 
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
-        let tr = &self.transform;
+        let tr = &self.0.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
         let scale = 1.0 / length(transformed_raydir);
         let normalized_transformed_raydir = mul(transformed_raydir, scale); // normalize
@@ -350,48 +356,36 @@ impl Node for Sphere {
         }
         let mut ts = vec![];
         if t1 > 0.0 {
-            ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Entry, 0));
+            ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Entry, 0));
         }
         if t2 > 0.0 {
-            ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, 0));
+            ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Exit, 0));
         }
         ts
     }
-    fn inside(&self, pos: Vec3) -> bool {
-        let transformed_pos = self.transform.inv_transform_point(pos);
-        dot(transformed_pos, transformed_pos) <= 1.0
-    }
+    // fn inside(&self, pos: Vec3) -> bool {
+    //     let transformed_pos = self.transform.inv_transform_point(pos);
+    //     dot(transformed_pos, transformed_pos) <= 1.0
+    // }
+}
+
+impl Primitive for Sphere {
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
         let [x, y, z] = opos;
         let v = (y + 1.0) / 2.0;
         let u = x.atan2(z);
-        (self.surface)(face, u, v)
-    }
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-        self.transform.translate(tx, ty, tz);
-    }
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-        self.transform.scale(sx, sy, sz);
-    }
-    fn uscale(&mut self, s: f64) {
-        self.transform.uscale(s);
-    }
-    fn rotatex(&mut self, d: f64) {
-        self.transform.rotatex(d);
-    }
-    fn rotatey(&mut self, d: f64) {
-        self.transform.rotatey(d);
-    }
-    fn rotatez(&mut self, d: f64) {
-        self.transform.rotatez(d);
-    }
-
-    fn transform_point(&self, p: Vec3) -> Vec3 {
-        self.transform.transform_point(p)
+        (self.0.surface)(face, u, v)
     }
 
     fn get_normal(&self, p: Vec3, _face: i64) -> Vec3 {
-        normalize(self.transform.transform_normal(p))
+        normalize(self.0.transform.transform_normal(p))
+    }
+
+    fn get_transform<'a>(&'a self) -> &'a Transform {
+        &self.0.transform
+    }
+    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+        &mut self.0.transform
     }
 }
 
@@ -406,29 +400,17 @@ static SLABS : [(i64, i64);3] = [(3, 2),
                                  (1, 0)];
 
 #[derive(Clone)]
-pub struct Cube {
-    transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
-}
+pub struct Cube(PrimitiveCommon);
 
 impl Cube {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cube {
-        Cube { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Cube(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
     }
 }
 
-impl Node for Cube {
-    fn name(&self) -> &str {
-        return "cube";
-    }
-
-    fn id(&self) -> NodeId {
-        self.id
-    }
-
-    fn find_node(&self, id: NodeId) -> Option<&Node> {
-        if id == self.id {
+impl IntersectRay for Cube {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+        if id == self.0.id {
             Some(self)
         } else {
             None
@@ -436,7 +418,7 @@ impl Node for Cube {
     }
 
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection> {
-        let tr = &self.transform;
+        let tr = &self.0.transform;
         let transformed_raydir = tr.inv_transform_vector(raydir);
         let scale = 1.0 / length(transformed_raydir);
         let normalized_transformed_raydir = mul(transformed_raydir, scale); // normalize
@@ -474,69 +456,51 @@ impl Node for Cube {
         }
         let mut ts = vec![];
         if tmin.unwrap().0 > 0.0 {
-            ts.push(Intersection::new(scale, tmin.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Entry, tmin.unwrap().1));
+            ts.push(Intersection::new(scale, tmin.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Entry, tmin.unwrap().1));
         }
         if tmax.unwrap().0 > 0.0 {
-            ts.push(Intersection::new(scale, tmax.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.id(), IntersectionType::Exit, tmax.unwrap().1));
+            ts.push(Intersection::new(scale, tmax.unwrap().0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Exit, tmax.unwrap().1));
         }
         ts
     }
 
-    fn inside(&self, pos: Vec3) -> bool {
-        let [x, y, z] = self.transform.inv_transform_point(pos);
-        0.0 <= x && x <= 1.0 && 0.0 <= y && y <= 1.0 && 0.0 <= z && z <= 1.0
-    }
+    // fn inside(&self, pos: Vec3) -> bool {
+    //     let [x, y, z] = self.transform.inv_transform_point(pos);
+    //     0.0 <= x && x <= 1.0 && 0.0 <= y && y <= 1.0 && 0.0 <= z && z <= 1.0
+    // }
+}
 
+impl Primitive for Cube {
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
         let [x, y, z] = opos;
         match face {
-            0 => (self.surface)(0, x, y),
-            1 => (self.surface)(1, x, y),
-            2 => (self.surface)(2, z, y),
-            3 => (self.surface)(3, z, y),
-            4 => (self.surface)(4, x, z),
-            5 => (self.surface)(5, x, z),
+            0 => (self.0.surface)(0, x, y),
+            1 => (self.0.surface)(1, x, y),
+            2 => (self.0.surface)(2, z, y),
+            3 => (self.0.surface)(3, z, y),
+            4 => (self.0.surface)(4, x, z),
+            5 => (self.0.surface)(5, x, z),
             _ => panic!("unexpected face")
         }
     }
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-        self.transform.translate(tx, ty, tz);
-    }
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-        self.transform.scale(sx, sy, sz);
-    }
-    fn uscale(&mut self, s: f64) {
-        self.transform.uscale(s);
-    }
-    fn rotatex(&mut self, d: f64) {
-        self.transform.rotatex(d);
-    }
-    fn rotatey(&mut self, d: f64) {
-        self.transform.rotatey(d);
-    }
-    fn rotatez(&mut self, d: f64) {
-        self.transform.rotatez(d);
-    }
-
-    fn transform_point(&self, p: Vec3) -> Vec3 {
-        self.transform.transform_point(p)
-    }
-
     fn get_normal(&self, _p: Vec3, face: i64) -> Vec3 {
-        normalize(self.transform.transform_normal(NORMALS[face as usize]))
+        normalize(self.0.transform.transform_normal(NORMALS[face as usize]))
+    }
+
+    fn get_transform<'a>(&'a self) -> &'a Transform {
+        &self.0.transform
+    }
+    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+        &mut self.0.transform
     }
 }
 
 #[derive(Clone)]
-pub struct Cylinder {
-    transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
-}
+pub struct Cylinder(PrimitiveCommon);
 
 impl Cylinder {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cylinder {
-        Cylinder { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Cylinder(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
     }
 
     fn solve_cyl(&self, px: f64, pz: f64, dx: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
@@ -576,17 +540,9 @@ impl Cylinder {
     }
 }
 
-impl Node for Cylinder {
-    fn name(&self) -> &str {
-        return "cylinder";
-    }
-
-    fn id(&self) -> NodeId {
-        self.id
-    }
-
-    fn find_node(&self, id: NodeId) -> Option<&Node> {
-        if id == self.id {
+impl IntersectRay for Cylinder {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+        if id == self.0.id {
             Some(self)
         } else {
             None
@@ -595,7 +551,7 @@ impl Node for Cylinder {
 
 
     fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
-        let tr = &self.transform;
+        let tr = &self.0.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
         raydir = mul(raydir, scale); // normalize
@@ -656,52 +612,30 @@ impl Node for Cylinder {
         let (tmin, tmax) = ts;
         let mut it = vec![];
         if tmin.0 > 0.0 {
-            it.push(Intersection::new(scale, tmin.0, raypos, raydir, self.id(), IntersectionType::Entry, tmin.1));
+            it.push(Intersection::new(scale, tmin.0, raypos, raydir, self.0.id, IntersectionType::Entry, tmin.1));
         }
         if tmax.0 > 0.0 {
-            it.push(Intersection::new(scale, tmax.0, raypos, raydir, self.id(), IntersectionType::Exit, tmax.1));
+            it.push(Intersection::new(scale, tmax.0, raypos, raydir, self.0.id, IntersectionType::Exit, tmax.1));
         }
         it
     }
 
-    fn inside(&self, pos: Vec3) -> bool {
-        let [x, y, z] = self.transform.inv_transform_point(pos);
-        (x * x + z * z) <= 1.0 && 0.0 <= y && y <= 1.0
-    }
+    // fn inside(&self, pos: Vec3) -> bool {
+    //     let [x, y, z] = self.0.transform.inv_transform_point(pos);
+    //     (x * x + z * z) <= 1.0 && 0.0 <= y && y <= 1.0
+    // }
+}
 
+impl Primitive for Cylinder {
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
         let [x, y, z] = opos;
         match face {
-            0 => (self.surface)(0, x.atan2(z), y),
-            1 => (self.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
-            2 => (self.surface)(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
+            0 => (self.0.surface)(0, x.atan2(z), y),
+            1 => (self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
+            2 => (self.0.surface)(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
             _ => panic!("invalid face")
         }
     }
-
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-        self.transform.translate(tx, ty, tz);
-    }
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-        self.transform.scale(sx, sy, sz);
-    }
-    fn uscale(&mut self, s: f64) {
-        self.transform.uscale(s);
-    }
-    fn rotatex(&mut self, d: f64) {
-        self.transform.rotatex(d);
-    }
-    fn rotatey(&mut self, d: f64) {
-        self.transform.rotatey(d);
-    }
-    fn rotatez(&mut self, d: f64) {
-        self.transform.rotatez(d);
-    }
-
-    fn transform_point(&self, p: Vec3) -> Vec3 {
-        self.transform.transform_point(p)
-    }
-
     fn get_normal(&self, p: Vec3, face: i64) -> Vec3 {
         let n = match face {
             0 => [p[0], 0.0, p[2]],
@@ -709,20 +643,23 @@ impl Node for Cylinder {
             2 => [0.0, -1.0, 0.0],
             _ => panic!("invalid face")
         };
-        normalize(self.transform.transform_normal(n))
+        normalize(self.0.transform.transform_normal(n))
+    }
+
+    fn get_transform<'a>(&'a self) -> &'a Transform {
+        &self.0.transform
+    }
+    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+        &mut self.0.transform
     }
 }
 
 #[derive(Clone)]
-pub struct Cone {
-    transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
-}
+pub struct Cone(PrimitiveCommon);
 
 impl Cone {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cone {
-        Cone { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Cone(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
     }
 
     fn solve_cone(&self, px: f64, py: f64, pz: f64, dx: f64, dy: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
@@ -748,17 +685,9 @@ impl Cone {
     }
 }
 
-impl Node for Cone {
-    fn name(&self) -> &str {
-        return "cone";
-    }
-
-    fn id(&self) -> NodeId {
-        self.id
-    }
-
-    fn find_node(&self, id: NodeId) -> Option<&Node> {
-        if id == self.id {
+impl IntersectRay for Cone {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+        if id == self.0.id {
             Some(self)
         } else {
             None
@@ -767,7 +696,7 @@ impl Node for Cone {
 
 
     fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
-        let tr = &self.transform;
+        let tr = &self.0.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
         raydir = mul(raydir, scale); // normalize
@@ -793,10 +722,10 @@ impl Node for Cone {
             if ts.len() == 2 {
                 let mut tr = vec![];
                 if ts[0].0 > 0.0 {
-                    tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
+                    tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.0.id, IntersectionType::Entry, ts[0].1));
                 }
                 if ts[1].0 > 0.0 {
-                    tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
+                    tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.0.id, IntersectionType::Exit, ts[1].1));
                 }
                 return tr;
             }
@@ -808,10 +737,10 @@ impl Node for Cone {
             ts.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
             let mut tr = vec![];
             if ts[0].0 > 0.0 {
-                tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.id(), IntersectionType::Entry, ts[0].1));
+                tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.0.id, IntersectionType::Entry, ts[0].1));
             }
             if ts[1].0 > 0.0 {
-                tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.id(), IntersectionType::Exit, ts[1].1));
+                tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.0.id, IntersectionType::Exit, ts[1].1));
             }
             tr
         } else {
@@ -819,17 +748,19 @@ impl Node for Cone {
         }
     }
 
-    fn inside(&self, pos: Vec3) -> bool {
-        let [x, y, z] = self.transform.inv_transform_point(pos);
-        let p = x * x - y * y + z * z;
-        p <= 0.0 && 0.0 <= y && y <= 1.0
-    }
+    // fn inside(&self, pos: Vec3) -> bool {
+    //     let [x, y, z] = self.0.transform.inv_transform_point(pos);
+    //     let p = x * x - y * y + z * z;
+    //     p <= 0.0 && 0.0 <= y && y <= 1.0
+    // }
+}
 
+impl Primitive for Cone {
     fn get_surface(&self, opos: Vec3, face: i64) -> (Vec3, f64, f64, f64) {
         let [x, y, z] = opos;
         match face {
-            0 => (self.surface)(0, x.atan2(z), y),
-            1 => (self.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
+            0 => (self.0.surface)(0, x.atan2(z), y),
+            1 => (self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0),
             _ => panic!("invalid face")
         }
     }
@@ -840,56 +771,29 @@ impl Node for Cone {
             1 => [0.0, 1.0, 0.0],
             _ => panic!("invalid face")
         };
-        normalize(self.transform.transform_normal(n))
-    }
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-        self.transform.translate(tx, ty, tz);
-    }
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-        self.transform.scale(sx, sy, sz);
-    }
-    fn uscale(&mut self, s: f64) {
-        self.transform.uscale(s);
-    }
-    fn rotatex(&mut self, d: f64) {
-        self.transform.rotatex(d);
-    }
-    fn rotatey(&mut self, d: f64) {
-        self.transform.rotatey(d);
-    }
-    fn rotatez(&mut self, d: f64) {
-        self.transform.rotatez(d);
+        normalize(self.0.transform.transform_normal(n))
     }
 
-    fn transform_point(&self, p: Vec3) -> Vec3 {
-        self.transform.transform_point(p)
+    fn get_transform<'a>(&'a self) -> &'a Transform {
+        &self.0.transform
+    }
+    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+        &mut self.0.transform
     }
 }
 
 #[derive(Clone)]
-pub struct Plane {
-    transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: NodeId
-}
+pub struct Plane(PrimitiveCommon);
 
 impl Plane {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Self {
-        Plane { transform: Default::default(), surface: surface, id: NodeId::new() }
+        Plane(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
     }
 }
 
-impl Node for Plane {
-    fn name(&self) -> &str {
-        return "plane";
-    }
-
-    fn id(&self) -> NodeId {
-        self.id
-    }
-
-    fn find_node(&self, id: NodeId) -> Option<&Node> {
-        if id == self.id {
+impl IntersectRay for Plane {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+        if id == self.0.id {
             Some(self)
         } else {
             None
@@ -898,7 +802,7 @@ impl Node for Plane {
 
     fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
         let np = [0.0, 1.0, 0.0];
-        let tr = &self.transform;
+        let tr = &self.0.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
         let scale = 1.0 / length(raydir);
         raydir = mul(raydir, scale);
@@ -912,46 +816,32 @@ impl Node for Plane {
             return vec![];
         }
         if denom > 0.0 {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Exit, 0)];
+            return vec![Intersection::new(scale, t, raypos, raydir, self.0.id, IntersectionType::Exit, 0)];
         } else {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.id(), IntersectionType::Entry, 0)];
+            return vec![Intersection::new(scale, t, raypos, raydir, self.0.id, IntersectionType::Entry, 0)];
         }
     }
 
-    fn inside(&self, pos: Vec3) -> bool {
-        self.transform.inv_transform_py(pos) <= 0.0
-    }
+    // fn inside(&self, pos: Vec3) -> bool {
+    //     self.0.transform.inv_transform_py(pos) <= 0.0
+    // }
+}
 
-    fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-        self.transform.translate(tx, ty, tz);
-    }
-    fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-        self.transform.scale(sx, sy, sz);
-    }
-    fn uscale(&mut self, s: f64) {
-        self.transform.uscale(s);
-    }
-    fn rotatex(&mut self, d: f64) {
-        self.transform.rotatex(d);
-    }
-    fn rotatey(&mut self, d: f64) {
-        self.transform.rotatey(d);
-    }
-    fn rotatez(&mut self, d: f64) {
-        self.transform.rotatez(d);
-    }
-
-    fn transform_point(&self, p: Vec3) -> Vec3 {
-        self.transform.transform_point(p)
-    }
-
+impl Primitive for Plane {
     fn get_surface(&self, opos: Vec3, _face: i64) -> (Vec3, f64, f64, f64) {
         let [x, _y, z] = opos;
-        (self.surface)(0, x, z)
+        (self.0.surface)(0, x, z)
     }
 
     fn get_normal(&self, _p: Vec3, _face: i64) -> Vec3 {
-        normalize(self.transform.transform_normal([0.0, 1.0, 0.0]))
+        normalize(self.0.transform.transform_normal([0.0, 1.0, 0.0]))
+    }
+
+    fn get_transform<'a>(&'a self) -> &'a Transform {
+        &self.0.transform
+    }
+    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+        &mut self.0.transform
     }
 }
 
@@ -962,7 +852,7 @@ fn test_intersection() {
         3.0,
         [1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
-        NodeId::new(),
+        PrimitiveId::new(),
         IntersectionType::Entry,
         0);
     assert!(i.distance == 6.0);

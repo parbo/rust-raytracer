@@ -1,7 +1,6 @@
 use vecmath::{Vec3, normalize, neg, sub, length, mul, dot};
 
 pub trait Light: LightClone {
-    fn name(&self) -> &str;
     fn get_direction(&self, pos: Vec3) -> (Vec3, Option<f64>);
     fn get_intensity(&self, pos: Vec3) -> Vec3;
 }
@@ -40,9 +39,6 @@ impl DirectionalLight {
 }
 
 impl Light for DirectionalLight {
-    fn name(&self) -> &str {
-        "light"
-    }
     fn get_direction(&self, _pos: Vec3) -> (Vec3, Option<f64>) {
         (self.direction, None)
     }
@@ -67,9 +63,6 @@ impl PointLight {
 }
 
 impl Light for PointLight {
-    fn name(&self) -> &str {
-        "pointlight"
-    }
     fn get_direction(&self, pos: Vec3) -> (Vec3, Option<f64>) {
         let d = sub(self.pos, pos);
         let dl = length(d);
@@ -108,10 +101,6 @@ impl SpotLight {
 }
 
 impl Light for SpotLight {
-    fn name(&self) -> &str {
-        "spotlight"
-    }
-
     fn get_direction(&self, pos: Vec3) -> (Vec3, Option<f64>) {
         let d = sub(self.pos, pos);
         let dl = length(d);

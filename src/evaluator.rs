@@ -124,6 +124,7 @@ pub enum EvalError {
     WrongTypeRef, // todo: include the context
     ArrayOutOfBounds(i64, usize),
     InvalidAst,
+    ParseError(parser::ParseError)
 }
 
 impl fmt::Display for EvalError {
@@ -140,7 +141,14 @@ impl StdError for EvalError {
             EvalError::WrongTypeRef => "WrongtypeRef",
             EvalError::ArrayOutOfBounds(_, _) => "ArrayOutOfBounds",
             EvalError::InvalidAst => "InvalidAst",
+            EvalError::ParseError(_) => "ParseError"
         }
+    }
+}
+
+impl From<parser::ParseError> for EvalError {
+    fn from(e: parser::ParseError) -> Self {
+        EvalError::ParseError(e)
     }
 }
 
@@ -801,7 +809,7 @@ fn evaluate(ast: &[parser::AstNode]) -> Result<(Env, Stack), EvalError> {
 }
 
 pub fn run(gml: &str) -> Result<(Env, Stack), EvalError> {
-    evaluate(&parser::parse(&tokenizer::tokenize(gml)))
+    evaluate(&parser::parse(&tokenizer::tokenize(gml))?)
 }
 
 

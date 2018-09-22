@@ -29,34 +29,34 @@ impl StdError for ParseError {
 }
 
 // This doesn't look like idiomatic rust..
-fn do_parse(tokens: &[tokenizer::Token], offset: usize) -> (usize, Vec<AstNode>) {
+fn do_parse(tokens: &[tokenizer::Token], offset: usize) -> Result<(usize, Vec<AstNode>), ParseError> {
     let mut ast = Vec::new();
     let mut i = offset;
     while i < tokens.len() {
         match &tokens[i] {
             &tokenizer::Token::EndFunction => {
-                return (i + 1, ast);
+                return Ok((i + 1, ast));
             }
             &tokenizer::Token::EndArray => {
-                return (i + 1, ast);
+                return Ok((i + 1, ast));
             }
             &tokenizer::Token::BeginFunction => {
-                let (new_i, tmp) = do_parse(tokens, i + 1);
+                let (new_i, tmp) = do_parse(tokens, i + 1)?;
                 i = new_i;
                 // Check that there was a matching end
                 match &tokens[i - 1] {
                     &tokenizer::Token::EndFunction => {}
-                    _ => panic!("syntax error"),
+                    _ => return Err(ParseError::SyntaxError),
                 }
                 ast.push(AstNode::Function(tmp));
             }
             &tokenizer::Token::BeginArray => {
-                let (new_i, tmp) = do_parse(tokens, i + 1);
+                let (new_i, tmp) = do_parse(tokens, i + 1)?;
                 i = new_i;
                 // Check that there was a matching end
                 match &tokens[i - 1] {
                     &tokenizer::Token::EndArray => {}
-                    _ => panic!("syntax error"),
+                    _ => return Err(ParseError::SyntaxError),
                 }
                 ast.push(AstNode::Array(tmp));
             }
@@ -68,11 +68,11 @@ fn do_parse(tokens: &[tokenizer::Token], offset: usize) -> (usize, Vec<AstNode>)
             }
         }
     }
-    (i, ast)
+    Ok((i, ast))
 }
 
 pub fn parse(a: &[tokenizer::Token]) -> Result<Vec<AstNode>, ParseError> {
-    let (i, ast) = do_parse(a, 0);
+    let (i, ast) = do_parse(a, 0)?;
     if i != a.len() {
         return Err(ParseError::SyntaxError);
     }

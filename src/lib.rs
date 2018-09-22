@@ -25,6 +25,6 @@ pub mod render {
     }
 
     pub fn render_gml(gml: &str) {
-        evaluator::run(gml);
+        evaluator::run(gml).expect("Could not evaluate gml");
     }
 }

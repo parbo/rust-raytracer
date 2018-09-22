@@ -118,12 +118,12 @@ fn pop(stack: &mut Stack) -> Result<Value, EvalError> {
 }
 
 #[derive(Debug)]
-enum EvalError {
+pub enum EvalError {
     EmptyStack,
     WrongType(Value),
     WrongTypeRef, // todo: include the context
-    OpNotImplemented(tokenizer::Ops),
     ArrayOutOfBounds(i64, usize),
+    InvalidAst,
 }
 
 impl fmt::Display for EvalError {
@@ -138,8 +138,8 @@ impl StdError for EvalError {
             EvalError::EmptyStack => "EmptyStack",
             EvalError::WrongType(_) => "Wrongtype",
             EvalError::WrongTypeRef => "WrongtypeRef",
-            EvalError::OpNotImplemented(_) => "OpNotImplemented",
             EvalError::ArrayOutOfBounds(_, _) => "ArrayOutOfBounds",
+            EvalError::InvalidAst => "InvalidAst",
         }
     }
 }
@@ -210,28 +210,28 @@ fn modi(a: i64, b: i64) -> i64 {
 fn get_integer(v: &Value) -> Result<i64, EvalError> {
     match v {
         &Value::ValInteger(i) => Ok(i),
-        other => Err(EvalError::WrongTypeRef)
+        _ => Err(EvalError::WrongTypeRef)
     }
 }
 
 fn get_string(v: &Value) -> Result<&String, EvalError> {
     match v {
         &Value::ValString(ref i) => Ok(&i),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn get_real(v: &Value) -> Result<f64, EvalError> {
     match v {
         &Value::ValReal(f) => Ok(f),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn get_boolean(v: &Value) -> Result<bool, EvalError> {
     match v {
         &Value::ValBoolean(b) => Ok(b),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -244,14 +244,14 @@ fn make_array(s: &Stack) -> Value {
 fn get_point(v: &Value) -> Result<&vecmath::Vec3, EvalError> {
     match v {
         &Value::ValPoint(ref p) => Ok(&p),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn move_point(v: Value) -> Result<vecmath::Vec3, EvalError> {
     match v {
         Value::ValPoint(p) => Ok(p),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -270,7 +270,7 @@ fn get_point_z(v: &Value) -> Result<f64, EvalError> {
 fn move_node(v: Value) -> Result<Box<primitives::Node>, EvalError> {
     match v {
         Value::ValNode(n) => Ok(n),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -281,14 +281,14 @@ fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
     if get_boolean(&pred)? {
         match c1 {
             Value::ValClosure(mut e, f) => {
-                Ok(do_evaluate(&mut e, stack, &f))
+                Ok(do_evaluate(&mut e, stack, &f)?)
             }
             other => Err(EvalError::WrongType(other)),
         }
     } else {
         match c2 {
             Value::ValClosure(mut e, f) => {
-                Ok(do_evaluate(&mut e, stack, &f))
+                Ok(do_evaluate(&mut e, stack, &f)?)
             }
             other => Err(EvalError::WrongType(other)),
         }
@@ -299,7 +299,7 @@ fn eval_apply(stack: &mut Stack) -> Result<(), EvalError> {
     let c = pop(stack)?;
     match c {
         Value::ValClosure(mut e, f) => {
-            Ok(do_evaluate(&mut e, stack, &f))
+            Ok(do_evaluate(&mut e, stack, &f)?)
         }
         other => Err(EvalError::WrongType(other)),
     }
@@ -509,7 +509,7 @@ fn eval_getz(stack: &mut Stack) -> Result<(), EvalError> {
 fn get_array(v: &Value) -> Result<&Vec<Value>, EvalError> {
     match v {
         &Value::ValArray(ref a) => Ok(a),
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -518,10 +518,10 @@ fn move_lights(v: Value) -> Result<Vec<Box<lights::Light>>, EvalError> {
         Value::ValArray(a) => {
             a.into_iter().map(|v| match v {
                 Value::ValLight(light) => Ok(light),
-                other => Err(EvalError::WrongTypeRef)
+                _ => Err(EvalError::WrongTypeRef)
             }).collect()
         }
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -737,7 +737,7 @@ fn move_surface(v: Value) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, 
                 stack.push(Value::ValInteger(face));
                 stack.push(Value::ValReal(u));
                 stack.push(Value::ValReal(v));
-                do_evaluate(&mut mutable_local_env, &mut stack, &ast);
+                do_evaluate(&mut mutable_local_env, &mut stack, &ast).expect("failed to evaluate");
                 let n = stack.pop().expect("empty stack");
                 let ks = stack.pop().expect("empty stack");
                 let kd = stack.pop().expect("empty stack");
@@ -748,11 +748,11 @@ fn move_surface(v: Value) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, 
                 (move_point(sc).expect("wrong type"), rkd, rks, rn)
             })))
         }
-        other => Err(EvalError::WrongTypeRef),
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
-fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
+fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) -> Result<(), EvalError> {
     for i in 0..ast.len() {
         match &ast[i] {
             &parser::AstNode::Function(ref v) => {
@@ -760,7 +760,7 @@ fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
             }
             &parser::AstNode::Array(ref v) => {
                 let mut local_stack = Stack::new();
-                do_evaluate(env, &mut local_stack, v);
+                do_evaluate(env, &mut local_stack, v)?;
                 stack.push(make_array(&local_stack));
             }
             &parser::AstNode::Leaf(ref t) => {
@@ -782,24 +782,25 @@ fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) {
                     &tokenizer::Token::Operator(ref v) => {
                         eval_op(v, stack).expect("error evaluation op");
                     }
-                    token => {
-                        panic!("evaluate error, unknown token: {:?}", token);
+                    _ => {
+                        return Err(EvalError::InvalidAst);
                     }
                 }
             }
         }
     }
+    Ok(())
 }
 
-fn evaluate(ast: &[parser::AstNode]) -> (Env, Stack) {
+fn evaluate(ast: &[parser::AstNode]) -> Result<(Env, Stack), EvalError> {
     let mut env: SnapMap<String, Value> = SnapMap::<String, Value>::new();
     let mut stack = Stack::new();
     stack.reserve(100); // Let's avoid too many allocations
-    do_evaluate(&mut env, &mut stack, &ast);
-    (env, stack)
+    do_evaluate(&mut env, &mut stack, &ast)?;
+    Ok((env, stack))
 }
 
-pub fn run(gml: &str) -> (Env, Stack) {
+pub fn run(gml: &str) -> Result<(Env, Stack), EvalError> {
     evaluate(&parser::parse(&tokenizer::tokenize(gml)))
 }
 
@@ -810,94 +811,94 @@ mod tests {
 
     #[test]
     fn test_bind_integer() {
-        let (env, _) = run("1 /x");
+        let (env, _) = run("1 /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValInteger(1));
     }
 
     #[test]
     fn test_bind_string() {
-        let (env, _) = run(r#""apa" /x"#);
+        let (env, _) = run(r#""apa" /x"#).unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValString("apa".to_string()));
         assert_eq!(*get_string(env.get("x").unwrap()).unwrap(), "apa".to_string());
     }
 
     #[test]
     fn test_addi() {
-        let (_, stack) = run("1 2 addi");
+        let (_, stack) = run("1 2 addi").unwrap();
         assert_eq!(stack, vec![Value::ValInteger(3)]);
     }
 
     #[test]
     fn test_addf() {
-        let (_, stack) = run("1.5 2.5 addf");
+        let (_, stack) = run("1.5 2.5 addf").unwrap();
         assert_eq!(stack, vec![Value::ValReal(4.0)]);
     }
 
     #[test]
     fn test_ref() {
-        let (_, stack) = run("1 /x x x addi");
+        let (_, stack) = run("1 /x x x addi").unwrap();
         assert_eq!(stack, vec![Value::ValInteger(2)]);
     }
 
     #[test]
     fn test_apply() {
-        let (_, stack) = run("1 { /x x x } apply");
+        let (_, stack) = run("1 { /x x x } apply").unwrap();
         assert_eq!(stack, vec![Value::ValInteger(1), Value::ValInteger(1)]);
     }
 
     #[test]
     fn test_if() {
-        let (_, stack) = run("true { 1 } { 2 } if");
+        let (_, stack) = run("true { 1 } { 2 } if").unwrap();
         assert_eq!(stack, vec![Value::ValInteger(1)]);
-        let (_, stack) = run("false { 1 } { 2 } if");
+        let (_, stack) = run("false { 1 } { 2 } if").unwrap();
         assert_eq!(stack, vec![Value::ValInteger(2)]);
     }
 
     #[test]
     fn test_eqi() {
-        let (_, stack) = run("1 2 eqi");
+        let (_, stack) = run("1 2 eqi").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("5 5 eqi");
+        let (_, stack) = run("5 5 eqi").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_eqf() {
-        let (_, stack) = run("1.5 2.7 eqf");
+        let (_, stack) = run("1.5 2.7 eqf").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("5.123 5.123 eqf");
+        let (_, stack) = run("5.123 5.123 eqf").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_lessi() {
-        let (_, stack) = run("2 1 lessi");
+        let (_, stack) = run("2 1 lessi").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("2 2 lessi");
+        let (_, stack) = run("2 2 lessi").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("1 2 lessi");
+        let (_, stack) = run("1 2 lessi").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_lessf() {
-        let (_, stack) = run("2.0 1.0 lessf");
+        let (_, stack) = run("2.0 1.0 lessf").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("2.0 2.0 lessf");
+        let (_, stack) = run("2.0 2.0 lessf").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(false)]);
-        let (_, stack) = run("1.0 2.0 lessf");
+        let (_, stack) = run("1.0 2.0 lessf").unwrap();
         assert_eq!(stack, vec![Value::ValBoolean(true)]);
     }
 
     #[test]
     fn test_successful_run() {
-        run("false /b b { 1 } { 2 } if");
-        run("4 /x 2 x addi");
-        run("1 { /x x x } apply addi");
-        run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply");
-        run("{ /x /y x y } /swap 3 4 swap apply");
+        run("false /b b { 1 } { 2 } if").unwrap();
+        run("4 /x 2 x addi").unwrap();
+        run("1 { /x x x } apply addi").unwrap();
+        run("{ /x x x } /dup { dup apply muli } /sq 3 sq apply").unwrap();
+        run("{ /x /y x y } /swap 3 4 swap apply").unwrap();
         run("{ /self /n n 2 lessi { 1 } { n 1 subi self self apply n muli } if } /fact 12 fact fact \
-             apply");
+             apply").unwrap();
     }
 
     #[test]
@@ -938,7 +939,7 @@ mod tests {
                 }
                 // Compare results (which should be the only thing om the top of the stack)
                 let expected = test(u / 10.0, v / 10.0);
-                let (_, stack) = run(prog.as_ref());
+                let (_, stack) = run(prog.as_ref()).unwrap();
                 assert_eq!(stack.len(), 1);
                 assert_eq!(get_integer(&stack[0]).unwrap(), expected);
             }
@@ -947,39 +948,39 @@ mod tests {
 
     #[test]
     fn test_clampf() {
-        let (env, _) = run("-0.4 clampf /x");
+        let (env, _) = run("-0.4 clampf /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.0));
-        let (env, _) = run("1.1 clampf /x");
+        let (env, _) = run("1.1 clampf /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
-        let (env, _) = run("0.8 clampf /x");
+        let (env, _) = run("0.8 clampf /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValReal(0.8));
     }
 
     #[test]
     fn test_array() {
-        let (env, _) = run("[1 2 3] length /x");
+        let (env, _) = run("[1 2 3] length /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValInteger(3));
-        let (env, _) = run("[1 2 3] 1 get /x");
+        let (env, _) = run("[1 2 3] 1 get /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValInteger(2));
-        let (env, _) = run("[0 1 2 3 4 5 6 7 8 9] /a a 0 get /x");
+        let (env, _) = run("[0 1 2 3 4 5 6 7 8 9] /a a 0 get /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValInteger(0));
     }
 
     #[test]
     fn test_point() {
-        let (env, _) = run("1.0 2.0 3.0 point /x");
+        let (env, _) = run("1.0 2.0 3.0 point /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValPoint([1.0, 2.0, 3.0]));
-        let (env, _) = run("1.0 2.0 3.0 point getx /x");
+        let (env, _) = run("1.0 2.0 3.0 point getx /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValReal(1.0));
-        let (env, _) = run("1.0 2.0 3.0 point gety /x");
+        let (env, _) = run("1.0 2.0 3.0 point gety /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValReal(2.0));
-        let (env, _) = run("1.0 2.0 3.0 point getz /x");
+        let (env, _) = run("1.0 2.0 3.0 point getz /x").unwrap();
         assert_eq!(env.get("x").unwrap(), &Value::ValReal(3.0));
     }
 
     #[test]
     fn test_sphere() {
-        let (env, _) = run("1.0 { /x x } sphere /x");
+        let (env, _) = run("1.0 { /x x } sphere /x").unwrap();
         match env.get("x").unwrap() {
             &Value::ValNode(ref x) => assert!(true),
             _ => assert!(false),
@@ -988,7 +989,7 @@ mod tests {
 
     #[test]
     fn test_light() {
-        let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x");
+        let (env, _) = run("1.0 0.0 0.0 point 0.7 0.5 0.3 point light /x").unwrap();
         match env.get("x").unwrap() {
             &Value::ValLight(ref x) => {
                 assert_eq!(x.get_direction([1.0, 1.0, 1.0]), ([-1.0, 0.0, 0.0], None));
@@ -1000,6 +1001,6 @@ mod tests {
 
     #[test]
     fn test_render() {
-        let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /v /u /face 0.8 0.2 v point 1.0 0.2 1.0 } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#);
+        let (_, _) = run(r#"1.0 0.0 0.0 point 0.7 0.5 0.3 point light /l 1.0 { /v /u /face 0.8 0.2 v point 1.0 0.2 1.0 } sphere /s 0.5 0.5 0.5 point [ l ] s 3 90.0 320 240 "eval.ppm" render"#).unwrap();
     }
 }

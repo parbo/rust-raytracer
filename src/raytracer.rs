@@ -197,6 +197,7 @@ pub fn render(amb: Vec3,
               filename: &str) {
     println!("render to filename: {:?}", filename);
     let mut image = VecImage::new();
+    image.new_image(filename, w, h);
     render_pixels(amb, lights, scene, depth, fov, w, h, &mut image);
     write_ppm_file(&image.pixels(), w, h, filename).expect("failed to write file");
 }
@@ -219,6 +220,7 @@ pub fn render(amb: Vec3,
               h: i64,
               filename: &str) {
     let mut renderer = RENDERER.lock().unwrap();
+    renderer.new_image(filename, w, h);
     render_pixels(amb, lights, scene, depth, fov, w, h, &mut **renderer);
 }
 

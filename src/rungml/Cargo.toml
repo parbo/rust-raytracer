@@ -1,16 +1,12 @@
 [package]
 
-name = "rust-raytracer"
+name = "rungml"
 version = "0.0.1"
 authors = ["Par Bohrarper <par.bohrarper@gmail.com>"]
 
-[lib]
-name = "rust_raytracer"
-path = "src/lib.rs"
-
 [dependencies]
-lazy_static = "1.1.0"
-vecmath = "0.3.1"
+rust-raytracer = { version = "0.0.1", path = "../../" }
+getopts = "0.2.18"
 
 [profile.release]
 debug = true

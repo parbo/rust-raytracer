@@ -108,7 +108,8 @@ fn trace(amb: Vec3,
 }
 
 pub trait Renderer: Send {
-    fn put_pixel(&mut self, x: i64, y: i64, pixel: Pixel);
+    fn new_image(&mut self, name: &str, w: i64, h: i64);
+    fn push_pixel(&mut self, pixel: Pixel);
 }
 
 pub fn render_pixels(amb: Vec3,
@@ -137,7 +138,7 @@ pub fn render_pixels(amb: Vec3,
                           depth,
                           raypos,
                           raydir);
-            renderer.put_pixel(ix, iy, p);
+            renderer.push_pixel(p);
         }
     }
 }
@@ -149,14 +150,8 @@ struct VecImage {
 }
 
 impl VecImage {
-    fn new(w: i64, h: i64) -> VecImage {
-        let mut selff = VecImage {
-            w: w,
-            h: h,
-            pixels: vec![]
-        };
-        selff.pixels.resize((w * h) as usize, [0.0, 0.0, 0.0]);
-        selff
+    fn new() -> VecImage {
+        VecImage { w: 0, h: 0, pixels: Vec::new() }
     }
 
     fn pixels(&self) -> &[Pixel] {
@@ -165,8 +160,13 @@ impl VecImage {
 }
 
 impl Renderer for VecImage {
-    fn put_pixel(&mut self, x: i64, y: i64, p: Pixel) {
-        self.pixels[(x + y * self.w) as usize] = p;
+    fn new_image(&mut self, _name: &str, w: i64, h: i64) {
+        self.w = w;
+        self.h = h;
+        self.pixels.resize((w * h) as usize, [0.0, 0.0, 0.0]);
+    }
+    fn push_pixel(&mut self, p: Pixel) {
+        self.pixels.push(p);
     }
 }
 
@@ -180,7 +180,9 @@ impl EmptyRenderer {
 }
 
 impl Renderer for EmptyRenderer {
-    fn put_pixel(&mut self, x: i64, y: i64, p: Pixel) {
+    fn new_image(&mut self, _name: &str, w: i64, h: i64) {
+    }
+    fn push_pixel(&mut self, p: Pixel) {
     }
 }
 
@@ -194,7 +196,7 @@ pub fn render(amb: Vec3,
               h: i64,
               filename: &str) {
     println!("render to filename: {:?}", filename);
-    let mut image = VecImage::new(w, h);
+    let mut image = VecImage::new();
     render_pixels(amb, lights, scene, depth, fov, w, h, &mut image);
     write_ppm_file(&image.pixels(), w, h, filename).expect("failed to write file");
 }

@@ -111,7 +111,7 @@ fn trace(
     }
 }
 
-pub trait Renderer: Send {
+pub trait Renderer {
     fn new_image(&mut self, name: &str, w: i64, h: i64);
     fn push_pixel(&mut self, pixel: Pixel);
 }
@@ -216,10 +216,32 @@ pub fn render(
 }
 
 #[cfg(target_arch = "wasm32")]
+pub trait RendererFactory: Send {
+    fn create(&self) -> Box<Renderer>;
+}
+
+#[cfg(target_arch = "wasm32")]
+struct EmptyRendererFactory {}
+
+#[cfg(target_arch = "wasm32")]
+impl EmptyRendererFactory {
+    fn new() -> EmptyRendererFactory {
+        EmptyRendererFactory {}
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl RendererFactory for EmptyRendererFactory {
+    fn create(&self) -> Box<Renderer> {
+        Box::new(EmptyRenderer::new())
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 lazy_static! {
-    pub static ref RENDERER: Mutex<Box<Renderer>> = {
-        let vi = Box::new(EmptyRenderer::new());
-        Mutex::<Box<Renderer>>::new(vi)
+    pub static ref RENDERER_FACTORY: Mutex<Box<RendererFactory>> = {
+        let vi = Box::new(EmptyRendererFactory::new());
+        Mutex::<Box<RendererFactory>>::new(vi)
     };
 }
 
@@ -235,15 +257,15 @@ pub fn render(
     h: i64,
     filename: &str,
 ) {
-    let mut renderer = RENDERER.lock().unwrap();
+    let mut renderer = RENDERER_FACTORY.lock().unwrap().create();
     renderer.new_image(filename, w, h);
-    render_pixels(amb, lights, scene, depth, fov, w, h, &mut **renderer);
+    render_pixels(amb, lights, scene, depth, fov, w, h, &mut *renderer);
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use lights::{DirectionalLight};
+    use lights::DirectionalLight;
     use primitives::Sphere;
     use std::rc::Rc;
 

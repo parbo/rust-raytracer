@@ -21,9 +21,9 @@ pub mod render {
     pub use raytracer::Renderer;
 
     #[cfg(target_arch = "wasm32")]
-    pub fn set_renderer(renderer: Box<raytracer::Renderer>) {
-        let mut r = raytracer::RENDERER.lock().unwrap();
-        *r = renderer;
+    pub fn set_renderer_factory(renderer_factory: Box<raytracer::RendererFactory>) {
+        let mut r = raytracer::RENDERER_FACTORY.lock().unwrap();
+        *r = renderer_factory;
     }
 
     pub fn render_gml(gml: &str) {

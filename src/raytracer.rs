@@ -1,11 +1,11 @@
-use std::sync::Mutex;
-use vecmath::{normalize, Vec3, mul, cmul, dot, add, sub, neg};
-use std::path::Path;
-use std::io::{Write, Result};
+use lights::{DirectionalLight, Light};
+use primitives::{IntersectRay, IntersectionType, Node, Primitive, Sphere};
 use std::fs::File;
+use std::io::{Result, Write};
+use std::path::Path;
 use std::rc::Rc;
-use primitives::{Node, Sphere, IntersectRay, Primitive, IntersectionType};
-use lights::{Light, DirectionalLight};
+use std::sync::Mutex;
+use vecmath::{add, cmul, dot, mul, neg, normalize, sub, Vec3};
 
 pub type Pixel = [f64; 3];
 pub type Color = [f64; 3];
@@ -27,7 +27,7 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()
 }
 
 fn get_ambient(c: Vec3, ia: Vec3, kd: f64) -> Color {
-    return mul(cmul(ia, c), kd)
+    return mul(cmul(ia, c), kd);
 }
 
 fn get_specular(ic: Color, lightdir: Vec3, sn: Vec3, pos: Vec3, raypos: Vec3, n: f64) -> Color {
@@ -40,13 +40,14 @@ fn get_specular(ic: Color, lightdir: Vec3, sn: Vec3, pos: Vec3, raypos: Vec3, n:
     }
 }
 
-fn trace(amb: Vec3,
-         lights: &[Box<Light>],
-         scene: &Node,
-         depth: i64,
-         raypos: Vec3,
-         raydir: Vec3)
-         -> Pixel {
+fn trace(
+    amb: Vec3,
+    lights: &[Box<Light>],
+    scene: &Node,
+    depth: i64,
+    raypos: Vec3,
+    raydir: Vec3,
+) -> Pixel {
     let i = scene.intersect(raypos, raydir);
     if i.len() > 0 {
         let ref isect = &i[0];
@@ -85,7 +86,8 @@ fn trace(amb: Vec3,
                         diffuse = add(diffuse, mul(ic, df));
                     }
                     if ks > 0.0 {
-                        specular = add(specular, get_specular(ic, lightdir, normal, pos, raypos, n));
+                        specular =
+                            add(specular, get_specular(ic, lightdir, normal, pos, raypos, n));
                     }
                 }
             }
@@ -112,14 +114,16 @@ pub trait Renderer: Send {
     fn push_pixel(&mut self, pixel: Pixel);
 }
 
-pub fn render_pixels(amb: Vec3,
-                     lights: Vec<Box<Light>>,
-                     scene: Box<Node>,
-                     depth: i64,
-                     fov: f64,
-                     w: i64,
-                     h: i64,
-                     renderer: &mut dyn Renderer) {
+pub fn render_pixels(
+    amb: Vec3,
+    lights: Vec<Box<Light>>,
+    scene: Box<Node>,
+    depth: i64,
+    fov: f64,
+    w: i64,
+    h: i64,
+    renderer: &mut dyn Renderer,
+) {
     let raypos = [0.0, 0.0, -1.0];
     let w_world = 2.0 * (0.5 * fov.to_radians()).tan();
     let h_world = h as f64 * w_world / w as f64;
@@ -132,12 +136,7 @@ pub fn render_pixels(amb: Vec3,
             let x = ix as f64;
             let dir = [c_x + (x + 0.5) * pw, c_y - (y + 0.5) * pw, -raypos[2]];
             let raydir = normalize(dir);
-            let p = trace(amb,
-                          &lights,
-                          &*scene,
-                          depth,
-                          raypos,
-                          raydir);
+            let p = trace(amb, &lights, &*scene, depth, raypos, raydir);
             renderer.push_pixel(p);
         }
     }
@@ -146,12 +145,16 @@ pub fn render_pixels(amb: Vec3,
 struct VecImage {
     w: i64,
     h: i64,
-    pixels: Vec<Pixel>
+    pixels: Vec<Pixel>,
 }
 
 impl VecImage {
     fn new() -> VecImage {
-        VecImage { w: 0, h: 0, pixels: Vec::new() }
+        VecImage {
+            w: 0,
+            h: 0,
+            pixels: Vec::new(),
+        }
     }
 
     fn pixels(&self) -> &[Pixel] {
@@ -170,8 +173,7 @@ impl Renderer for VecImage {
     }
 }
 
-struct EmptyRenderer {
-}
+struct EmptyRenderer {}
 
 impl EmptyRenderer {
     fn new() -> EmptyRenderer {
@@ -180,21 +182,21 @@ impl EmptyRenderer {
 }
 
 impl Renderer for EmptyRenderer {
-    fn new_image(&mut self, _name: &str, w: i64, h: i64) {
-    }
-    fn push_pixel(&mut self, p: Pixel) {
-    }
+    fn new_image(&mut self, _name: &str, w: i64, h: i64) {}
+    fn push_pixel(&mut self, p: Pixel) {}
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn render(amb: Vec3,
-              lights: Vec<Box<Light>>,
-              scene: Box<Node>,
-              depth: i64,
-              fov: f64,
-              w: i64,
-              h: i64,
-              filename: &str) {
+pub fn render(
+    amb: Vec3,
+    lights: Vec<Box<Light>>,
+    scene: Box<Node>,
+    depth: i64,
+    fov: f64,
+    w: i64,
+    h: i64,
+    filename: &str,
+) {
     println!("render to filename: {:?}", filename);
     let mut image = VecImage::new();
     image.new_image(filename, w, h);
@@ -211,14 +213,16 @@ lazy_static! {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn render(amb: Vec3,
-              lights: Vec<Box<Light>>,
-              scene: Box<Node>,
-              depth: i64,
-              fov: f64,
-              w: i64,
-              h: i64,
-              filename: &str) {
+pub fn render(
+    amb: Vec3,
+    lights: Vec<Box<Light>>,
+    scene: Box<Node>,
+    depth: i64,
+    fov: f64,
+    w: i64,
+    h: i64,
+    filename: &str,
+) {
     let mut renderer = RENDERER.lock().unwrap();
     renderer.new_image(filename, w, h);
     render_pixels(amb, lights, scene, depth, fov, w, h, &mut **renderer);
@@ -234,7 +238,11 @@ fn test_ppm() {
     let mut pixels = Vec::new();
     for y in 0..256 {
         for x in 0..256 {
-            pixels.push([x as f64 / 255.0, y as f64 / 255.0, (x + y) as f64 / (2.0 * 255.0)]);
+            pixels.push([
+                x as f64 / 255.0,
+                y as f64 / 255.0,
+                (x + y) as f64 / (2.0 * 255.0),
+            ]);
         }
     }
     write_ppm_file(&pixels, 256, 256, "test.ppm").expect("failed to write file");
@@ -248,8 +256,13 @@ fn render_scene(lights: Vec<Box<Light>>, mut scene: Box<Node>, name: &str) {
 
 #[test]
 fn test_raytrace() {
-    let mut lights : Vec<Box<Light>> = Vec::new();
-    lights.push(Box::new(DirectionalLight::new([1.0, 0.0, 0.0], [0.3, 0.4, 0.5])));
-    let scene = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
+    let mut lights: Vec<Box<Light>> = Vec::new();
+    lights.push(Box::new(DirectionalLight::new(
+        [1.0, 0.0, 0.0],
+        [0.3, 0.4, 0.5],
+    )));
+    let scene = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| {
+        ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)
+    }))));
     render_scene(lights, scene, "scene_sphere.ppm");
 }

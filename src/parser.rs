@@ -1,6 +1,6 @@
-use tokenizer;
 use std::error::Error as StdError;
 use std::fmt;
+use tokenizer;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
@@ -29,7 +29,10 @@ impl StdError for ParseError {
 }
 
 // This doesn't look like idiomatic rust..
-fn do_parse(tokens: &[tokenizer::Token], offset: usize) -> Result<(usize, Vec<AstNode>), ParseError> {
+fn do_parse(
+    tokens: &[tokenizer::Token],
+    offset: usize,
+) -> Result<(usize, Vec<AstNode>), ParseError> {
     let mut ast = Vec::new();
     let mut i = offset;
     while i < tokens.len() {
@@ -86,37 +89,63 @@ fn test_syntax_error() {
     parse(&[tokenizer::Token::BeginArray]).expect("syntax error");
     parse(&[tokenizer::Token::EndFunction]).expect("syntax error");
     parse(&[tokenizer::Token::EndArray]).expect("syntax error");
-    parse(&[tokenizer::Token::BeginFunction,
-            tokenizer::Token::Integer(1),
-            tokenizer::Token::BeginArray,
-            tokenizer::Token::Integer(2),
-            tokenizer::Token::Integer(3),
-            tokenizer::Token::EndFunction,
-            tokenizer::Token::EndArray]).expect("syntax error");
+    parse(&[
+        tokenizer::Token::BeginFunction,
+        tokenizer::Token::Integer(1),
+        tokenizer::Token::BeginArray,
+        tokenizer::Token::Integer(2),
+        tokenizer::Token::Integer(3),
+        tokenizer::Token::EndFunction,
+        tokenizer::Token::EndArray,
+    ])
+    .expect("syntax error");
 }
 
 #[test]
 fn test_parser() {
-    assert_eq!(parse(&[tokenizer::Token::BeginArray,
-                       tokenizer::Token::Integer(1),
-                       tokenizer::Token::Integer(2),
-                       tokenizer::Token::EndArray]).expect("error"),
-               [AstNode::Array(vec![AstNode::Leaf(tokenizer::Token::Integer(1)),
-                                    AstNode::Leaf(tokenizer::Token::Integer(2))])]);
-    assert_eq!(parse(&[tokenizer::Token::BeginFunction,
-                       tokenizer::Token::Integer(1),
-                       tokenizer::Token::Integer(2),
-                       tokenizer::Token::EndFunction]).expect("error"),
-               [AstNode::Function(vec![AstNode::Leaf(tokenizer::Token::Integer(1)),
-                                       AstNode::Leaf(tokenizer::Token::Integer(2))])]);
-    assert_eq!(parse(&[tokenizer::Token::BeginFunction,
-                       tokenizer::Token::Integer(1),
-                       tokenizer::Token::BeginArray,
-                       tokenizer::Token::Integer(2),
-                       tokenizer::Token::Integer(3),
-                       tokenizer::Token::EndArray,
-                       tokenizer::Token::EndFunction]).expect("error"),
-               [AstNode::Function(vec![AstNode::Leaf(tokenizer::Token::Integer(1)),
-                                       AstNode::Array(vec![AstNode::Leaf(tokenizer::Token::Integer(2)),
-                                                           AstNode::Leaf(tokenizer::Token::Integer(3))])])]);
+    assert_eq!(
+        parse(&[
+            tokenizer::Token::BeginArray,
+            tokenizer::Token::Integer(1),
+            tokenizer::Token::Integer(2),
+            tokenizer::Token::EndArray
+        ])
+        .expect("error"),
+        [AstNode::Array(vec![
+            AstNode::Leaf(tokenizer::Token::Integer(1)),
+            AstNode::Leaf(tokenizer::Token::Integer(2))
+        ])]
+    );
+    assert_eq!(
+        parse(&[
+            tokenizer::Token::BeginFunction,
+            tokenizer::Token::Integer(1),
+            tokenizer::Token::Integer(2),
+            tokenizer::Token::EndFunction
+        ])
+        .expect("error"),
+        [AstNode::Function(vec![
+            AstNode::Leaf(tokenizer::Token::Integer(1)),
+            AstNode::Leaf(tokenizer::Token::Integer(2))
+        ])]
+    );
+    assert_eq!(
+        parse(&[
+            tokenizer::Token::BeginFunction,
+            tokenizer::Token::Integer(1),
+            tokenizer::Token::BeginArray,
+            tokenizer::Token::Integer(2),
+            tokenizer::Token::Integer(3),
+            tokenizer::Token::EndArray,
+            tokenizer::Token::EndFunction
+        ])
+        .expect("error"),
+        [AstNode::Function(vec![
+            AstNode::Leaf(tokenizer::Token::Integer(1)),
+            AstNode::Array(vec![
+                AstNode::Leaf(tokenizer::Token::Integer(2)),
+                AstNode::Leaf(tokenizer::Token::Integer(3))
+            ])
+        ])]
+    );
 }

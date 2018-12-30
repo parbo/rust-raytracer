@@ -1,13 +1,13 @@
-use vecmath::{Vec3, add, dot, mul, neg, length, normalize, sub};
-use transform::Transform;
-use std::rc::Rc;
 use std::cmp::Ordering;
-use std::mem;
-use std::iter;
-use std::sync::atomic::{self, AtomicUsize};
 use std::error::Error as StdError;
 use std::fmt;
 use std::fmt::Debug;
+use std::iter;
+use std::mem;
+use std::rc::Rc;
+use std::sync::atomic::{self, AtomicUsize};
+use transform::Transform;
+use vecmath::{add, dot, length, mul, neg, normalize, sub, Vec3};
 
 static PRIMITIVE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
 
@@ -74,7 +74,8 @@ pub trait NodeClone {
 }
 
 impl<T> NodeClone for T
-    where T: 'static + Node + Clone
+where
+    T: 'static + Node + Clone,
 {
     fn clone_box(&self) -> Box<Node> {
         Box::new(self.clone())
@@ -111,7 +112,7 @@ impl<T: Primitive + IntersectRay + Clone + 'static> Node for T {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IntersectionType {
     Entry,
-    Exit
+    Exit,
 }
 
 #[derive(Copy, Clone)]
@@ -124,7 +125,7 @@ pub struct Intersection {
     pub primitive_id: PrimitiveId,
     pub t: IntersectionType,
     pub original_t: IntersectionType,
-    pub face: i64  // Todo: maybe use a type instea
+    pub face: i64, // Todo: maybe use a type instea
 }
 
 impl PartialOrd for Intersection {
@@ -147,7 +148,7 @@ impl Intersection {
         rd: Vec3,
         primitive_id: PrimitiveId,
         t: IntersectionType,
-        face: i64
+        face: i64,
     ) -> Intersection {
         Intersection {
             scale: scale,
@@ -158,7 +159,7 @@ impl Intersection {
             primitive_id: primitive_id,
             t: t,
             original_t: t,
-            face: face
+            face: face,
         }
     }
 
@@ -272,10 +273,10 @@ impl IntersectRay for Operator {
         let obj1i = self.obj1.intersect(raypos, raydir);
         let obj2i = self.obj2.intersect(raypos, raydir);
 
-        let mut intersections: Vec<(&Intersection, i32)> = obj1i.iter()
+        let mut intersections: Vec<(&Intersection, i32)> = obj1i
+            .iter()
             .zip(iter::repeat(1))
-            .chain(obj2i.iter()
-                   .zip(iter::repeat(2)))
+            .chain(obj2i.iter().zip(iter::repeat(2)))
             .collect();
         intersections.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Less));
 
@@ -289,7 +290,7 @@ impl IntersectRay for Operator {
                     } else {
                         inside2 = inside2 + 1;
                     }
-                },
+                }
                 IntersectionType::Exit => {
                     if *obj == 1 {
                         inside1 = inside1 - 1;
@@ -328,7 +329,7 @@ impl IntersectRay for Operator {
 pub struct PrimitiveCommon {
     transform: Transform,
     surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
-    id: PrimitiveId
+    id: PrimitiveId,
 }
 
 #[derive(Clone)]
@@ -336,13 +337,11 @@ pub struct Sphere(PrimitiveCommon);
 
 impl Sphere {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
-        Sphere(
-            PrimitiveCommon {
-                transform: Default::default(),
-                surface: surface,
-                id: PrimitiveId::new()
-            }
-        )
+        Sphere(PrimitiveCommon {
+            transform: Default::default(),
+            surface: surface,
+            id: PrimitiveId::new(),
+        })
     }
 }
 
@@ -378,10 +377,26 @@ impl IntersectRay for Sphere {
         }
         let mut ts = vec![];
         if t1 > 0.0 {
-            ts.push(Intersection::new(scale, t1, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Entry, 0));
+            ts.push(Intersection::new(
+                scale,
+                t1,
+                transformed_raypos,
+                normalized_transformed_raydir,
+                self.0.id,
+                IntersectionType::Entry,
+                0,
+            ));
         }
         if t2 > 0.0 {
-            ts.push(Intersection::new(scale, t2, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Exit, 0));
+            ts.push(Intersection::new(
+                scale,
+                t2,
+                transformed_raypos,
+                normalized_transformed_raydir,
+                self.0.id,
+                IntersectionType::Exit,
+                0,
+            ));
         }
         ts
     }
@@ -419,22 +434,26 @@ impl Primitive for Sphere {
     }
 }
 
-static NORMALS : [Vec3;6] = [[0.0, 0.0, -1.0],
-                             [0.0, 0.0, 1.0],
-                             [-1.0, 0.0, 0.0],
-                             [1.0, 0.0, 0.0],
-                             [0.0, 1.0, 0.0],
-                             [0.0, -1.0, 0.0]];
-static SLABS : [(i64, i64);3] = [(3, 2),
-                                 (4, 5),
-                                 (1, 0)];
+static NORMALS: [Vec3; 6] = [
+    [0.0, 0.0, -1.0],
+    [0.0, 0.0, 1.0],
+    [-1.0, 0.0, 0.0],
+    [1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, -1.0, 0.0],
+];
+static SLABS: [(i64, i64); 3] = [(3, 2), (4, 5), (1, 0)];
 
 #[derive(Clone)]
 pub struct Cube(PrimitiveCommon);
 
 impl Cube {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cube {
-        Cube(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
+        Cube(PrimitiveCommon {
+            transform: Default::default(),
+            surface: surface,
+            id: PrimitiveId::new(),
+        })
     }
 }
 
@@ -469,27 +488,21 @@ impl IntersectRay for Cube {
                     mem::swap(&mut face1, &mut face2);
                 }
                 tmin = match tmin {
-                    Some(v) if v.0 >= t1 => {
-                        tmin
-                    },
-                    _ => Some((t1, face1))
+                    Some(v) if v.0 >= t1 => tmin,
+                    _ => Some((t1, face1)),
                 };
                 tmax = match tmax {
-                    Some(v) if v.0 <= t2 => {
-                        tmax
-                    },
-                    _ => Some((t2, face2))
+                    Some(v) if v.0 <= t2 => tmax,
+                    _ => Some((t2, face2)),
                 };
                 match (tmin, tmax) {
-                    (Some(a), Some(b)) if a.0 > b.0 => {
-                        return vec![]
-                    },
+                    (Some(a), Some(b)) if a.0 > b.0 => return vec![],
                     _ => {}
                 }
                 match tmax {
                     Some(b) if b.0 < 0.0 => {
                         return vec![];
-                    },
+                    }
                     _ => {}
                 }
             } else if -e - 0.5 > 0.0 || -e + 0.5 < 0.0 {
@@ -499,14 +512,30 @@ impl IntersectRay for Cube {
         let mut ts = vec![];
         match tmin {
             Some(a) if a.0 > 0.0 => {
-                ts.push(Intersection::new(scale, a.0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Entry, a.1));
-            },
+                ts.push(Intersection::new(
+                    scale,
+                    a.0,
+                    transformed_raypos,
+                    normalized_transformed_raydir,
+                    self.0.id,
+                    IntersectionType::Entry,
+                    a.1,
+                ));
+            }
             _ => {}
         }
         match tmax {
             Some(b) if b.0 > 0.0 => {
-                ts.push(Intersection::new(scale, b.0, transformed_raypos, normalized_transformed_raydir, self.0.id, IntersectionType::Exit, b.1));
-            },
+                ts.push(Intersection::new(
+                    scale,
+                    b.0,
+                    transformed_raypos,
+                    normalized_transformed_raydir,
+                    self.0.id,
+                    IntersectionType::Exit,
+                    b.1,
+                ));
+            }
             _ => {}
         }
         ts
@@ -534,7 +563,9 @@ impl Primitive for Cube {
 
     fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
         if face >= 0 && (face as usize) < NORMALS.len() {
-            Ok(normalize(self.0.transform.transform_normal(NORMALS[face as usize])))
+            Ok(normalize(
+                self.0.transform.transform_normal(NORMALS[face as usize]),
+            ))
         } else {
             Err(PrimitivesError::InvalidFace(face))
         }
@@ -553,7 +584,11 @@ pub struct Cylinder(PrimitiveCommon);
 
 impl Cylinder {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cylinder {
-        Cylinder(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
+        Cylinder(PrimitiveCommon {
+            transform: Default::default(),
+            surface: surface,
+            id: PrimitiveId::new(),
+        })
     }
 
     fn solve_cyl(&self, px: f64, pz: f64, dx: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
@@ -601,7 +636,6 @@ impl IntersectRay for Cylinder {
             None
         }
     }
-
 
     fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
         let tr = &self.0.transform;
@@ -665,10 +699,26 @@ impl IntersectRay for Cylinder {
         let (tmin, tmax) = ts;
         let mut it = vec![];
         if tmin.0 > 0.0 {
-            it.push(Intersection::new(scale, tmin.0, raypos, raydir, self.0.id, IntersectionType::Entry, tmin.1));
+            it.push(Intersection::new(
+                scale,
+                tmin.0,
+                raypos,
+                raydir,
+                self.0.id,
+                IntersectionType::Entry,
+                tmin.1,
+            ));
         }
         if tmax.0 > 0.0 {
-            it.push(Intersection::new(scale, tmax.0, raypos, raydir, self.0.id, IntersectionType::Exit, tmax.1));
+            it.push(Intersection::new(
+                scale,
+                tmax.0,
+                raypos,
+                raydir,
+                self.0.id,
+                IntersectionType::Exit,
+                tmax.1,
+            ));
         }
         it
     }
@@ -686,7 +736,7 @@ impl Primitive for Cylinder {
             0 => Ok((self.0.surface)(0, x.atan2(z), y)),
             1 => Ok((self.0.surface)(1, (x + 1.0) / 2.0, (z + 1.0) / 2.0)),
             2 => Ok((self.0.surface)(2, (x + 1.0) / 2.0, (z + 1.0) / 2.0)),
-            face => Err(PrimitivesError::InvalidFace(face))
+            face => Err(PrimitivesError::InvalidFace(face)),
         }
     }
     fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
@@ -712,10 +762,22 @@ pub struct Cone(PrimitiveCommon);
 
 impl Cone {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cone {
-        Cone(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
+        Cone(PrimitiveCommon {
+            transform: Default::default(),
+            surface: surface,
+            id: PrimitiveId::new(),
+        })
     }
 
-    fn solve_cone(&self, px: f64, py: f64, pz: f64, dx: f64, dy: f64, dz: f64) -> Option<((f64, i64), (f64, i64))> {
+    fn solve_cone(
+        &self,
+        px: f64,
+        py: f64,
+        pz: f64,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+    ) -> Option<((f64, i64), (f64, i64))> {
         // solve x ^ 2 + z ^ 2 = y ^ 2
         // (px + t * dx) ^ 2 + (pz + t * dz) ^ 2 = (py + t * dy) ^ 2
         // a * t ^ 2 + b * t + c = 0
@@ -747,7 +809,6 @@ impl IntersectRay for Cone {
         }
     }
 
-
     fn intersect(&self, in_raypos: Vec3, in_raydir: Vec3) -> Vec<Intersection> {
         let tr = &self.0.transform;
         let mut raydir = tr.inv_transform_vector(in_raydir);
@@ -775,10 +836,26 @@ impl IntersectRay for Cone {
             if ts.len() == 2 {
                 let mut tr = vec![];
                 if ts[0].0 > 0.0 {
-                    tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.0.id, IntersectionType::Entry, ts[0].1));
+                    tr.push(Intersection::new(
+                        scale,
+                        ts[0].0,
+                        raypos,
+                        raydir,
+                        self.0.id,
+                        IntersectionType::Entry,
+                        ts[0].1,
+                    ));
                 }
                 if ts[1].0 > 0.0 {
-                    tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.0.id, IntersectionType::Exit, ts[1].1));
+                    tr.push(Intersection::new(
+                        scale,
+                        ts[1].0,
+                        raypos,
+                        raydir,
+                        self.0.id,
+                        IntersectionType::Exit,
+                        ts[1].1,
+                    ));
                 }
                 return tr;
             }
@@ -790,10 +867,26 @@ impl IntersectRay for Cone {
             ts.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Less));
             let mut tr = vec![];
             if ts[0].0 > 0.0 {
-                tr.push(Intersection::new(scale, ts[0].0, raypos, raydir, self.0.id, IntersectionType::Entry, ts[0].1));
+                tr.push(Intersection::new(
+                    scale,
+                    ts[0].0,
+                    raypos,
+                    raydir,
+                    self.0.id,
+                    IntersectionType::Entry,
+                    ts[0].1,
+                ));
             }
             if ts[1].0 > 0.0 {
-                tr.push(Intersection::new(scale, ts[1].0, raypos, raydir, self.0.id, IntersectionType::Exit, ts[1].1));
+                tr.push(Intersection::new(
+                    scale,
+                    ts[1].0,
+                    raypos,
+                    raydir,
+                    self.0.id,
+                    IntersectionType::Exit,
+                    ts[1].1,
+                ));
             }
             tr
         } else {
@@ -840,7 +933,11 @@ pub struct Plane(PrimitiveCommon);
 
 impl Plane {
     pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Self {
-        Plane(PrimitiveCommon { transform: Default::default(), surface: surface, id: PrimitiveId::new() })
+        Plane(PrimitiveCommon {
+            transform: Default::default(),
+            surface: surface,
+            id: PrimitiveId::new(),
+        })
     }
 }
 
@@ -869,9 +966,25 @@ impl IntersectRay for Plane {
             return vec![];
         }
         if denom > 0.0 {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.0.id, IntersectionType::Exit, 0)];
+            return vec![Intersection::new(
+                scale,
+                t,
+                raypos,
+                raydir,
+                self.0.id,
+                IntersectionType::Exit,
+                0,
+            )];
         } else {
-            return vec![Intersection::new(scale, t, raypos, raydir, self.0.id, IntersectionType::Entry, 0)];
+            return vec![Intersection::new(
+                scale,
+                t,
+                raypos,
+                raydir,
+                self.0.id,
+                IntersectionType::Entry,
+                0,
+            )];
         }
     }
 
@@ -892,7 +1005,9 @@ impl Primitive for Plane {
 
     fn get_normal(&self, _p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
         if face == 0 {
-            Ok(normalize(self.0.transform.transform_normal([0.0, 1.0, 0.0])))
+            Ok(normalize(
+                self.0.transform.transform_normal([0.0, 1.0, 0.0]),
+            ))
         } else {
             Err(PrimitivesError::InvalidFace(face))
         }
@@ -915,7 +1030,8 @@ fn test_intersection() {
         [1.0, 1.0, 1.0],
         PrimitiveId::new(),
         IntersectionType::Entry,
-        0);
+        0,
+    );
     assert!(i.distance == 6.0);
     assert!(i.t == IntersectionType::Entry);
     i.switch(IntersectionType::Exit);
@@ -924,7 +1040,9 @@ fn test_intersection() {
 
 #[test]
 fn test_intersection_sphere() {
-    let mut obj = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)))));
+    let mut obj = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| {
+        ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)
+    }))));
     obj.translate(0.0, 0.0, 5.0);
     let mut intersections = obj.intersect([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
     for i in intersections.iter_mut() {

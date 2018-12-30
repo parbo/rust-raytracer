@@ -1,4 +1,4 @@
-use vecmath::{Mat4, identity, Vec3, transform, mmmul, mvmuly, transpose};
+use vecmath::{identity, mmmul, mvmuly, transform, transpose, Mat4, Vec3};
 
 #[derive(Clone)]
 pub struct Transform {
@@ -40,16 +40,19 @@ impl Transform {
         mvmuly(self.inv_m, [x, y, z, 1.0])
     }
 
-
     pub fn scale(&mut self, sx: f64, sy: f64, sz: f64) {
-        let sc = [[sx, 0.0, 0.0, 0.0],
-                  [0.0, sy, 0.0, 0.0],
-                  [0.0, 0.0, sz, 0.0],
-                  [0.0, 0.0, 0.0, 1.0]];
-        let inv_sc = [[1.0/sx, 0.0, 0.0, 0.0],
-                      [0.0, 1.0/sy, 0.0, 0.0],
-                      [0.0, 0.0, 1.0/sz, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]];
+        let sc = [
+            [sx, 0.0, 0.0, 0.0],
+            [0.0, sy, 0.0, 0.0],
+            [0.0, 0.0, sz, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let inv_sc = [
+            [1.0 / sx, 0.0, 0.0, 0.0],
+            [0.0, 1.0 / sy, 0.0, 0.0],
+            [0.0, 0.0, 1.0 / sz, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         self.m = mmmul(sc, self.m);
         self.inv_m = mmmul(self.inv_m, inv_sc);
     }
@@ -59,14 +62,18 @@ impl Transform {
     }
 
     pub fn translate(&mut self, tx: f64, ty: f64, tz: f64) {
-        let tr = [[1.0, 0.0, 0.0, tx],
-                  [0.0, 1.0, 0.0, ty],
-                  [0.0, 0.0, 1.0, tz],
-                  [0.0, 0.0, 0.0, 1.0]];
-        let inv_tr = [[1.0, 0.0, 0.0, -tx],
-                      [0.0, 1.0, 0.0, -ty],
-                      [0.0, 0.0, 1.0, -tz],
-                      [0.0, 0.0, 0.0, 1.0]];
+        let tr = [
+            [1.0, 0.0, 0.0, tx],
+            [0.0, 1.0, 0.0, ty],
+            [0.0, 0.0, 1.0, tz],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let inv_tr = [
+            [1.0, 0.0, 0.0, -tx],
+            [0.0, 1.0, 0.0, -ty],
+            [0.0, 0.0, 1.0, -tz],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         self.m = mmmul(tr, self.m);
         self.inv_m = mmmul(self.inv_m, inv_tr);
     }
@@ -74,14 +81,18 @@ impl Transform {
     pub fn rotatex(&mut self, d: f64) {
         let cosd = d.to_radians().cos();
         let sind = d.to_radians().sin();
-        let rx = [[1.0, 0.0, 0.0, 0.0],
-                  [0.0, cosd, -sind, 0.0],
-                  [0.0, sind, cosd, 0.0],
-                  [0.0, 0.0, 0.0, 1.0]];
-        let inv_rx = [[1.0, 0.0, 0.0, 0.0],
-                      [0.0, cosd, sind, 0.0],
-                      [0.0, -sind, cosd, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]];
+        let rx = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, cosd, -sind, 0.0],
+            [0.0, sind, cosd, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let inv_rx = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, cosd, sind, 0.0],
+            [0.0, -sind, cosd, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         self.m = mmmul(rx, self.m);
         self.inv_m = mmmul(self.inv_m, inv_rx);
     }
@@ -89,14 +100,18 @@ impl Transform {
     pub fn rotatey(&mut self, d: f64) {
         let cosd = d.to_radians().cos();
         let sind = d.to_radians().sin();
-        let ry = [[cosd, 0.0, sind, 0.0],
-                  [0.0, 1.0, 0.0, 0.0],
-                  [-sind, 0.0, cosd, 0.0],
-                  [0.0, 0.0, 0.0, 1.0]];
-        let inv_ry = [[cosd, 0.0, -sind, 0.0],
-                      [0.0, 1.0, 0.0, 0.0],
-                      [sind, 0.0, cosd, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]];
+        let ry = [
+            [cosd, 0.0, sind, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [-sind, 0.0, cosd, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let inv_ry = [
+            [cosd, 0.0, -sind, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [sind, 0.0, cosd, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         self.m = mmmul(ry, self.m);
         self.inv_m = mmmul(self.inv_m, inv_ry);
     }
@@ -104,14 +119,18 @@ impl Transform {
     pub fn rotatez(&mut self, d: f64) {
         let cosd = d.to_radians().cos();
         let sind = d.to_radians().sin();
-        let rz = [[cosd, -sind, 0.0, 0.0],
-                  [sind, cosd, 0.0, 0.0],
-                  [0.0, 0.0, 1.0, 0.0],
-                  [0.0, 0.0, 0.0, 1.0]];
-        let inv_rz = [[cosd, sind, 0.0, 0.0],
-                      [-sind, cosd, 0.0, 0.0],
-                      [0.0, 0.0, 1.0, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]];
+        let rz = [
+            [cosd, -sind, 0.0, 0.0],
+            [sind, cosd, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let inv_rz = [
+            [cosd, sind, 0.0, 0.0],
+            [-sind, cosd, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         self.m = mmmul(rz, self.m);
         self.inv_m = mmmul(self.inv_m, inv_rz);
     }

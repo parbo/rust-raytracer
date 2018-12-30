@@ -1,17 +1,17 @@
+use lights;
+use parser;
+use primitives;
+use raytracer;
+use std::borrow::Borrow;
+use std::clone::Clone;
 use std::collections;
 use std::error::Error as StdError;
 use std::fmt;
 use std::fmt::Debug;
-use std::rc::Rc;
 use std::hash::Hash;
-use std::borrow::Borrow;
-use std::clone::Clone;
-use parser;
-use primitives;
+use std::rc::Rc;
 use tokenizer;
 use vecmath;
-use lights;
-use raytracer;
 
 #[derive(Clone)]
 pub enum Value {
@@ -64,15 +64,16 @@ impl PartialEq for Value {
 #[derive(Clone)]
 pub struct SnapMap<K, V> {
     snapshot: Rc<Box<collections::HashMap<K, V>>>,
-    current: collections::HashMap<K, V>
+    current: collections::HashMap<K, V>,
 }
 
-impl<K, V> PartialEq for SnapMap<K, V> where
+impl<K, V> PartialEq for SnapMap<K, V>
+where
     K: Eq + Hash,
-    V: PartialEq {
+    V: PartialEq,
+{
     fn eq(&self, other: &SnapMap<K, V>) -> bool {
-        *self.snapshot == *other.snapshot &&
-            self.current == other.current
+        *self.snapshot == *other.snapshot && self.current == other.current
     }
 }
 
@@ -80,23 +81,31 @@ impl<K: Hash + Eq, V> SnapMap<K, V> {
     pub fn new() -> SnapMap<K, V> {
         SnapMap {
             snapshot: Rc::new(Box::new(collections::HashMap::<K, V>::new())),
-            current: collections::HashMap::<K, V>::new()
+            current: collections::HashMap::<K, V>::new(),
         }
     }
 
-    pub fn snapshot(&self) -> SnapMap<K, V> where K: Clone + Debug, V: Clone + Debug {
+    pub fn snapshot(&self) -> SnapMap<K, V>
+    where
+        K: Clone + Debug,
+        V: Clone + Debug,
+    {
         let mut snapshot = self.current.clone();
         for (k, v) in self.snapshot.iter() {
             snapshot.insert(k.clone(), v.clone());
         }
         SnapMap {
             snapshot: Rc::new(Box::new(snapshot)),
-            current: collections::HashMap::<K, V>::new()
+            current: collections::HashMap::<K, V>::new(),
         }
     }
 
     pub fn get<Q: ?Sized>(&self, k: &Q) -> Option<&V>
-    where K: Borrow<Q> + Debug, Q: Hash + Eq + Debug, V: Debug {
+    where
+        K: Borrow<Q> + Debug,
+        Q: Hash + Eq + Debug,
+        V: Debug,
+    {
         if let Some(v) = self.current.get(k) {
             return Some(v);
         } else if let Some(v) = self.snapshot.get(k) {
@@ -124,7 +133,7 @@ pub enum EvalError {
     WrongTypeRef, // todo: include the context
     ArrayOutOfBounds(i64, usize),
     InvalidAst,
-    ParseError(parser::ParseError)
+    ParseError(parser::ParseError),
 }
 
 impl fmt::Display for EvalError {
@@ -141,7 +150,7 @@ impl StdError for EvalError {
             EvalError::WrongTypeRef => "WrongtypeRef",
             EvalError::ArrayOutOfBounds(_, _) => "ArrayOutOfBounds",
             EvalError::InvalidAst => "InvalidAst",
-            EvalError::ParseError(_) => "ParseError"
+            EvalError::ParseError(_) => "ParseError",
         }
     }
 }
@@ -218,7 +227,7 @@ fn modi(a: i64, b: i64) -> i64 {
 fn get_integer(v: &Value) -> Result<i64, EvalError> {
     match v {
         &Value::ValInteger(i) => Ok(i),
-        _ => Err(EvalError::WrongTypeRef)
+        _ => Err(EvalError::WrongTypeRef),
     }
 }
 
@@ -288,16 +297,12 @@ fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
     let pred = pop(stack)?;
     if get_boolean(&pred)? {
         match c1 {
-            Value::ValClosure(mut e, f) => {
-                Ok(do_evaluate(&mut e, stack, &f)?)
-            }
+            Value::ValClosure(mut e, f) => Ok(do_evaluate(&mut e, stack, &f)?),
             other => Err(EvalError::WrongType(other)),
         }
     } else {
         match c2 {
-            Value::ValClosure(mut e, f) => {
-                Ok(do_evaluate(&mut e, stack, &f)?)
-            }
+            Value::ValClosure(mut e, f) => Ok(do_evaluate(&mut e, stack, &f)?),
             other => Err(EvalError::WrongType(other)),
         }
     }
@@ -306,9 +311,7 @@ fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_apply(stack: &mut Stack) -> Result<(), EvalError> {
     let c = pop(stack)?;
     match c {
-        Value::ValClosure(mut e, f) => {
-            Ok(do_evaluate(&mut e, stack, &f)?)
-        }
+        Value::ValClosure(mut e, f) => Ok(do_evaluate(&mut e, stack, &f)?),
         other => Err(EvalError::WrongType(other)),
     }
 }
@@ -422,7 +425,10 @@ fn eval_lessf(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_modi(stack: &mut Stack) -> Result<(), EvalError> {
     let i2 = pop(stack)?;
     let i1 = pop(stack)?;
-    stack.push(Value::ValInteger(modi(get_integer(&i1)?, get_integer(&i2)?)));
+    stack.push(Value::ValInteger(modi(
+        get_integer(&i1)?,
+        get_integer(&i2)?,
+    )));
     Ok(())
 }
 
@@ -492,7 +498,11 @@ fn eval_point(stack: &mut Stack) -> Result<(), EvalError> {
     let z = pop(stack)?;
     let y = pop(stack)?;
     let x = pop(stack)?;
-    stack.push(Value::ValPoint([get_real(&x)?, get_real(&y)?, get_real(&z)?]));
+    stack.push(Value::ValPoint([
+        get_real(&x)?,
+        get_real(&y)?,
+        get_real(&z)?,
+    ]));
     Ok(())
 }
 
@@ -523,12 +533,13 @@ fn get_array(v: &Value) -> Result<&Vec<Value>, EvalError> {
 
 fn move_lights(v: Value) -> Result<Vec<Box<lights::Light>>, EvalError> {
     match v {
-        Value::ValArray(a) => {
-            a.into_iter().map(|v| match v {
+        Value::ValArray(a) => a
+            .into_iter()
+            .map(|v| match v {
                 Value::ValLight(light) => Ok(light),
-                _ => Err(EvalError::WrongTypeRef)
-            }).collect()
-        }
+                _ => Err(EvalError::WrongTypeRef),
+            })
+            .collect(),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
@@ -554,52 +565,69 @@ fn eval_length(stack: &mut Stack) -> Result<(), EvalError> {
 
 fn eval_sphere(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(move_surface(surface)?))));
+    stack.push(Value::ValNode(Box::new(primitives::Sphere::new(
+        move_surface(surface)?,
+    ))));
     Ok(())
 }
 
 fn eval_union(stack: &mut Stack) -> Result<(), EvalError> {
     let obj2 = pop(stack)?;
     let obj1 = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Operator::make_union(move_node(obj1)?, move_node(obj2)?))));
+    stack.push(Value::ValNode(Box::new(primitives::Operator::make_union(
+        move_node(obj1)?,
+        move_node(obj2)?,
+    ))));
     Ok(())
 }
 
 fn eval_intersect(stack: &mut Stack) -> Result<(), EvalError> {
     let obj2 = pop(stack)?;
     let obj1 = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Operator::make_intersect(move_node(obj1)?, move_node(obj2)?))));
+    stack.push(Value::ValNode(Box::new(
+        primitives::Operator::make_intersect(move_node(obj1)?, move_node(obj2)?),
+    )));
     Ok(())
 }
 
 fn eval_difference(stack: &mut Stack) -> Result<(), EvalError> {
     let obj2 = pop(stack)?;
     let obj1 = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Operator::make_difference(move_node(obj1)?, move_node(obj2)?))));
+    stack.push(Value::ValNode(Box::new(
+        primitives::Operator::make_difference(move_node(obj1)?, move_node(obj2)?),
+    )));
     Ok(())
 }
 
 fn eval_cube(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Cube::new(move_surface(surface)?))));
+    stack.push(Value::ValNode(Box::new(primitives::Cube::new(
+        move_surface(surface)?,
+    ))));
     Ok(())
 }
 
 fn eval_cylinder(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Cylinder::new(move_surface(surface)?))));
+    stack.push(Value::ValNode(Box::new(primitives::Cylinder::new(
+        move_surface(surface)?,
+    ))));
     Ok(())
 }
 
 fn eval_cone(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Cone::new(move_surface(surface)?))));
+    stack.push(Value::ValNode(Box::new(primitives::Cone::new(
+        move_surface(surface)?,
+    ))));
     Ok(())
 }
 
 fn eval_plane(stack: &mut Stack) -> Result<(), EvalError> {
     let surface = pop(stack)?;
-    stack.push(Value::ValNode(Box::new(primitives::Plane::new(move_surface(surface)?))));
+    stack.push(Value::ValNode(Box::new(primitives::Plane::new(
+        move_surface(surface)?,
+    ))));
     Ok(())
 }
 
@@ -613,8 +641,8 @@ fn eval_translate(stack: &mut Stack) -> Result<(), EvalError> {
             node.translate(get_real(&tx)?, get_real(&ty)?, get_real(&tz)?);
             stack.push(Value::ValNode(node));
             Ok(())
-        },
-        other => Err(EvalError::WrongType(other))
+        }
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
@@ -628,8 +656,8 @@ fn eval_scale(stack: &mut Stack) -> Result<(), EvalError> {
             node.scale(get_real(&sx)?, get_real(&sy)?, get_real(&sz)?);
             stack.push(Value::ValNode(node));
             Ok(())
-        },
-        other => Err(EvalError::WrongType(other))
+        }
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
@@ -641,8 +669,8 @@ fn eval_uscale(stack: &mut Stack) -> Result<(), EvalError> {
             node.uscale(get_real(&s)?);
             stack.push(Value::ValNode(node));
             Ok(())
-        },
-        other => Err(EvalError::WrongType(other))
+        }
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
@@ -654,8 +682,8 @@ fn eval_rotatex(stack: &mut Stack) -> Result<(), EvalError> {
             node.rotatex(get_real(&d)?);
             stack.push(Value::ValNode(node));
             Ok(())
-        },
-        other => Err(EvalError::WrongType(other))
+        }
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
@@ -667,8 +695,8 @@ fn eval_rotatey(stack: &mut Stack) -> Result<(), EvalError> {
             node.rotatey(get_real(&d)?);
             stack.push(Value::ValNode(node));
             Ok(())
-        },
-        other => Err(EvalError::WrongType(other))
+        }
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
@@ -680,24 +708,28 @@ fn eval_rotatez(stack: &mut Stack) -> Result<(), EvalError> {
             node.rotatez(get_real(&d)?);
             stack.push(Value::ValNode(node));
             Ok(())
-        },
-        other => Err(EvalError::WrongType(other))
+        }
+        other => Err(EvalError::WrongType(other)),
     }
 }
 
 fn eval_light(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let d = pop(stack)?;
-    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(move_point(d)?,
-                                                                      move_point(color)?))));
+    stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(
+        move_point(d)?,
+        move_point(color)?,
+    ))));
     Ok(())
 }
 
 fn eval_pointlight(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let p = pop(stack)?;
-    stack.push(Value::ValLight(Box::new(lights::PointLight::new(move_point(p)?,
-                                                                move_point(color)?))));
+    stack.push(Value::ValLight(Box::new(lights::PointLight::new(
+        move_point(p)?,
+        move_point(color)?,
+    ))));
     Ok(())
 }
 
@@ -707,11 +739,13 @@ fn eval_spotlight(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let at = pop(stack)?;
     let pos = pop(stack)?;
-    stack.push(Value::ValLight(Box::new(lights::SpotLight::new(move_point(pos)?,
-                                                               move_point(at)?,
-                                                               move_point(color)?,
-                                                               get_real(&cutoff)?,
-                                                               get_real(&exp)?))));
+    stack.push(Value::ValLight(Box::new(lights::SpotLight::new(
+        move_point(pos)?,
+        move_point(at)?,
+        move_point(color)?,
+        get_real(&cutoff)?,
+        get_real(&exp)?,
+    ))));
     Ok(())
 }
 
@@ -724,22 +758,26 @@ fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     let obj = pop(stack)?;
     let lights = pop(stack)?;
     let amb = pop(stack)?;
-    raytracer::render(move_point(amb)?,
-                      move_lights(lights)?,
-                      move_node(obj)?,
-                      get_integer(&depth)?,
-                      get_real(&fov)?,
-                      get_integer(&wid)?,
-                      get_integer(&ht)?,
-                      get_string(&file)?);
+    raytracer::render(
+        move_point(amb)?,
+        move_lights(lights)?,
+        move_node(obj)?,
+        get_integer(&depth)?,
+        get_real(&fov)?,
+        get_integer(&wid)?,
+        get_integer(&ht)?,
+        get_string(&file)?,
+    );
     Ok(())
 }
 
 // Let's move into here, to avoid one clone
-fn move_surface(v: Value) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>>, EvalError> {
+fn move_surface(
+    v: Value,
+) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>>, EvalError> {
     match v {
-        Value::ValClosure(env, ast) => {
-            Ok(Rc::new(Box::new(move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
+        Value::ValClosure(env, ast) => Ok(Rc::new(Box::new(
+            move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
                 let mut mutable_local_env = env.clone();
                 let mut stack = Stack::new();
                 stack.push(Value::ValInteger(face));
@@ -754,8 +792,8 @@ fn move_surface(v: Value) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, 
                 let rks = get_real(&ks).expect("not a real");
                 let rn = get_real(&n).expect("not a real");
                 (move_point(sc).expect("wrong type"), rkd, rks, rn)
-            })))
-        }
+            },
+        ))),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
@@ -812,7 +850,6 @@ pub fn run(gml: &str) -> Result<(Env, Stack), EvalError> {
     evaluate(&parser::parse(&tokenizer::tokenize(gml))?)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -826,8 +863,14 @@ mod tests {
     #[test]
     fn test_bind_string() {
         let (env, _) = run(r#""apa" /x"#).expect("error");
-        assert_eq!(env.get("x").expect("error"), &Value::ValString("apa".to_string()));
-        assert_eq!(*get_string(env.get("x").expect("error")).expect("error"), "apa".to_string());
+        assert_eq!(
+            env.get("x").expect("error"),
+            &Value::ValString("apa".to_string())
+        );
+        assert_eq!(
+            *get_string(env.get("x").expect("error")).expect("error"),
+            "apa".to_string()
+        );
     }
 
     #[test]
@@ -917,13 +960,15 @@ mod tests {
                 let v = vi as f64;
                 // Implement a small program
                 // Escaping { in format strings is done by adding an extra brace -> {{
-                let prog = format!("1 /col1 2 /col2 {:.1} /u {:.1} /v {{ /y /x x x mulf y y mulf \
-                                    addf sqrt }} /dist \n {{ \n u 0.5 subf /u v 0.5 subf /v \n u u v \
-                                    dist apply divf /b \n 0.0 v lessf {{ b asin }} {{ 360.0 b asin \
-                                    subf }} if 180.0 addf 30.0 divf \n floor 2 modi 1 eqi {{ col1 }} \
-                                    {{ col2 }} if \n }} apply",
-                                   u / 10.0,
-                                   v / 10.0);
+                let prog = format!(
+                    "1 /col1 2 /col2 {:.1} /u {:.1} /v {{ /y /x x x mulf y y mulf \
+                     addf sqrt }} /dist \n {{ \n u 0.5 subf /u v 0.5 subf /v \n u u v \
+                     dist apply divf /b \n 0.0 v lessf {{ b asin }} {{ 360.0 b asin \
+                     subf }} if 180.0 addf 30.0 divf \n floor 2 modi 1 eqi {{ col1 }} \
+                     {{ col2 }} if \n }} apply",
+                    u / 10.0,
+                    v / 10.0
+                );
                 // Implement the same program in rust:
                 fn test(u: f64, v: f64) -> i64 {
                     let u = u - 0.5;
@@ -977,7 +1022,10 @@ mod tests {
     #[test]
     fn test_point() {
         let (env, _) = run("1.0 2.0 3.0 point /x").expect("error");
-        assert_eq!(env.get("x").expect("error"), &Value::ValPoint([1.0, 2.0, 3.0]));
+        assert_eq!(
+            env.get("x").expect("error"),
+            &Value::ValPoint([1.0, 2.0, 3.0])
+        );
         let (env, _) = run("1.0 2.0 3.0 point getx /x").expect("error");
         assert_eq!(env.get("x").expect("error"), &Value::ValReal(1.0));
         let (env, _) = run("1.0 2.0 3.0 point gety /x").expect("error");

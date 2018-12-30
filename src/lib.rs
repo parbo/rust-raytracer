@@ -2,17 +2,17 @@
 extern crate lazy_static;
 
 mod evaluator;
-mod raytracer;
-mod parser;
-mod tokenizer;
-mod primitives;
 mod lights;
-mod vecmath;
+mod parser;
+mod primitives;
+mod raytracer;
+mod tokenizer;
 mod transform;
+mod vecmath;
 
 pub mod render {
-    use raytracer;
     use evaluator;
+    use raytracer;
     use std::rc::Rc;
 
     pub use raytracer::Pixel;

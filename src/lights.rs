@@ -1,4 +1,4 @@
-use vecmath::{Vec3, normalize, neg, sub, length, mul, dot};
+use vecmath::{dot, length, mul, neg, normalize, sub, Vec3};
 
 pub trait Light: LightClone {
     fn get_direction(&self, pos: Vec3) -> (Vec3, Option<f64>);
@@ -10,7 +10,8 @@ pub trait LightClone {
 }
 
 impl<T> LightClone for T
-    where T: 'static + Light + Clone
+where
+    T: 'static + Light + Clone,
 {
     fn clone_box(&self) -> Box<Light> {
         Box::new(self.clone())
@@ -55,10 +56,7 @@ pub struct PointLight {
 
 impl PointLight {
     pub fn new(p: Vec3, c: Vec3) -> PointLight {
-        PointLight {
-            pos: p,
-            color: c,
-        }
+        PointLight { pos: p, color: c }
     }
 }
 
@@ -83,19 +81,21 @@ pub struct SpotLight {
     color: Vec3,
     cutoff: f64,
     coscutoff: f64,
-    exp: f64
+    exp: f64,
 }
 
 impl SpotLight {
-    pub fn new(pos: Vec3,
-               at: Vec3,
-               color: Vec3,
-               cutoff: f64,
-               exp: f64) -> SpotLight {
+    pub fn new(pos: Vec3, at: Vec3, color: Vec3, cutoff: f64, exp: f64) -> SpotLight {
         let d = normalize(sub(at, pos));
         let coscutoff = cutoff.to_radians().cos();
         SpotLight {
-            pos: pos, at: at, d: d, color: color, cutoff: cutoff, coscutoff: coscutoff, exp: exp
+            pos: pos,
+            at: at,
+            d: d,
+            color: color,
+            cutoff: cutoff,
+            coscutoff: coscutoff,
+            exp: exp,
         }
     }
 }

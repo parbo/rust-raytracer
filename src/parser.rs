@@ -16,7 +16,7 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return f.write_str(self.description());
+        f.write_str(self.description())
     }
 }
 
@@ -36,37 +36,37 @@ fn do_parse(
     let mut ast = Vec::new();
     let mut i = offset;
     while i < tokens.len() {
-        match &tokens[i] {
-            &tokenizer::Token::EndFunction => {
+        match tokens[i] {
+            tokenizer::Token::EndFunction => {
                 return Ok((i + 1, ast));
             }
-            &tokenizer::Token::EndArray => {
+            tokenizer::Token::EndArray => {
                 return Ok((i + 1, ast));
             }
-            &tokenizer::Token::BeginFunction => {
+            tokenizer::Token::BeginFunction => {
                 let (new_i, tmp) = do_parse(tokens, i + 1)?;
                 i = new_i;
                 // Check that there was a matching end
-                match &tokens[i - 1] {
-                    &tokenizer::Token::EndFunction => {}
+                match tokens[i - 1] {
+                    tokenizer::Token::EndFunction => {}
                     _ => return Err(ParseError::SyntaxError),
                 }
                 ast.push(AstNode::Function(tmp));
             }
-            &tokenizer::Token::BeginArray => {
+            tokenizer::Token::BeginArray => {
                 let (new_i, tmp) = do_parse(tokens, i + 1)?;
                 i = new_i;
                 // Check that there was a matching end
-                match &tokens[i - 1] {
-                    &tokenizer::Token::EndArray => {}
+                match tokens[i - 1] {
+                    tokenizer::Token::EndArray => {}
                     _ => return Err(ParseError::SyntaxError),
                 }
                 ast.push(AstNode::Array(tmp));
             }
-            token => {
+            ref token => {
                 i += 1;
                 // This doesn't really seem right
-                let tmp = AstNode::Leaf((*token).clone());
+                let tmp = AstNode::Leaf((token).clone());
                 ast.push(tmp);
             }
         }

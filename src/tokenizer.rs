@@ -108,11 +108,11 @@ fn comment_tokenizer(a: &str) -> Option<Result> {
 fn block_comment_tokenizer(a: &str) -> Option<Result> {
     let mut consumed = 0;
     if a.starts_with("/*") {
-        consumed = consumed + 2;
+        consumed += 2;
         while !a[consumed..].starts_with("*/") {
-            consumed = consumed + 1;
+            consumed += 1;
         }
-        consumed = consumed + 2;
+        consumed += 2;
     }
     match consumed {
         0 => None,
@@ -320,7 +320,7 @@ fn eat_digits(a: &str) -> usize {
             break;
         }
     }
-    return consumed;
+    consumed
 }
 
 fn real_tokenizer(a: &str) -> Option<Result> {
@@ -379,15 +379,15 @@ fn real_tokenizer(a: &str) -> Option<Result> {
         consumed += exponent_digits;
     }
     // If we've come this far, everything is a-ok
-    return Some(Result(
+    Some(Result(
         Token::Real(a[0..consumed].parse().expect("error parsing real")),
         consumed,
         true,
-    ));
+    ))
 }
 
 fn integer_tokenizer(a: &str) -> Option<Result> {
-    if a.len() == 0 {
+    if a.is_empty() {
         return None;
     }
     let mut pos = 0;
@@ -433,7 +433,7 @@ fn string_tokenizer(a: &str) -> Option<Result> {
         match consumed {
             0 => None,
             _ => Some(Result(
-                Token::Str(String::from(&a[1..(consumed + 1)])),
+                Token::Str(String::from(&a[1..=consumed])),
                 consumed + 2,
                 true,
             )), // Add 2 for the "'s
@@ -466,15 +466,12 @@ pub fn tokenize(text: &str) -> Vec<Token> {
     loop {
         let last_pos = pos;
         for &tokenizer in tokenizers.iter() {
-            match tokenizer(&text[pos..]) {
-                Some(Result(token, consumed, emit)) => {
-                    if emit {
-                        tokenlist.push(token)
-                    }
-                    pos += consumed;
-                    break;
+            if let Some(Result(token, consumed, emit)) = tokenizer(&text[pos..]) {
+                if emit {
+                    tokenlist.push(token)
                 }
-                None => {}
+                pos += consumed;
+                break;
             }
         }
         if pos == last_pos || pos == text.len() {
@@ -482,7 +479,7 @@ pub fn tokenize(text: &str) -> Vec<Token> {
         }
     }
 
-    return tokenlist;
+    tokenlist
 }
 
 #[test]

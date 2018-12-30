@@ -89,13 +89,13 @@ impl SpotLight {
         let d = normalize(sub(at, pos));
         let coscutoff = cutoff.to_radians().cos();
         SpotLight {
-            pos: pos,
-            at: at,
-            d: d,
-            color: color,
-            cutoff: cutoff,
-            coscutoff: coscutoff,
-            exp: exp,
+            pos,
+            at,
+            d,
+            color,
+            cutoff,
+            coscutoff,
+            exp,
         }
     }
 }

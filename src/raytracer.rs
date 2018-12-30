@@ -1,16 +1,18 @@
-use lights::{DirectionalLight, Light};
-use primitives::{IntersectRay, IntersectionType, Node, Primitive, Sphere};
-use std::fs::File;
-use std::io::{Result, Write};
-use std::path::Path;
-use std::rc::Rc;
-use std::sync::Mutex;
+use lights::Light;
+use primitives::{IntersectionType, Node};
 use vecmath::{add, cmul, dot, mul, neg, normalize, sub, Vec3};
+
+#[cfg(target_arch = "wasm32")]
+use std::sync::Mutex;
 
 pub type Pixel = [f64; 3];
 pub type Color = [f64; 3];
 
-fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()> {
+#[cfg(not(target_arch = "wasm32"))]
+fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> std::io::Result<()> {
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::Path;
     let path = Path::new(filename);
     let mut file = try!(File::create(&path));
     let header = format!("P6 {} {} 255\n", w, h);
@@ -22,12 +24,12 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> Result<()
         data.push((255.0 * p[1].max(0.0).min(1.0)) as u8);
         data.push((255.0 * p[2].max(0.0).min(1.0)) as u8);
     }
-    try!(file.write(&data));
+    try!(file.write_all(&data));
     Ok(())
 }
 
 fn get_ambient(c: Vec3, ia: Vec3, kd: f64) -> Color {
-    return mul(cmul(ia, c), kd);
+    mul(cmul(ia, c), kd)
 }
 
 fn get_specular(ic: Color, lightdir: Vec3, sn: Vec3, pos: Vec3, raypos: Vec3, n: f64) -> Color {
@@ -49,8 +51,8 @@ fn trace(
     raydir: Vec3,
 ) -> Pixel {
     let i = scene.intersect(raypos, raydir);
-    if i.len() > 0 {
-        let ref isect = &i[0];
+    if !i.is_empty() {
+        let isect = &(&i[0]);
         if isect.t == IntersectionType::Exit {
             return [0.0, 0.0, 0.0];
         }
@@ -72,7 +74,7 @@ fn trace(
                 let poseps = add(pos, mul(lightdir, 1e-7));
                 let lighti = scene.intersect(poseps, lightdir);
                 // This must be possible to do more nicely
-                let mut do_lights = lighti.len() == 0;
+                let mut do_lights = lighti.is_empty();
                 if !do_lights {
                     if let Some(ld) = lightdistance {
                         if ld < lighti[0].distance {
@@ -105,7 +107,7 @@ fn trace(
             c
         }
     } else {
-        return [0.0, 0.0, 0.0];
+        [0.0, 0.0, 0.0]
     }
 }
 
@@ -114,9 +116,11 @@ pub trait Renderer: Send {
     fn push_pixel(&mut self, pixel: Pixel);
 }
 
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn render_pixels(
     amb: Vec3,
-    lights: Vec<Box<Light>>,
+    lights: &[Box<Light>],
     scene: Box<Node>,
     depth: i64,
     fov: f64,
@@ -136,18 +140,20 @@ pub fn render_pixels(
             let x = ix as f64;
             let dir = [c_x + (x + 0.5) * pw, c_y - (y + 0.5) * pw, -raypos[2]];
             let raydir = normalize(dir);
-            let p = trace(amb, &lights, &*scene, depth, raypos, raydir);
-            renderer.push_pixel(p);
+            let pixel = trace(amb, &lights, &*scene, depth, raypos, raydir);
+            renderer.push_pixel(pixel);
         }
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 struct VecImage {
     w: i64,
     h: i64,
     pixels: Vec<Pixel>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl VecImage {
     fn new() -> VecImage {
         VecImage {
@@ -162,6 +168,7 @@ impl VecImage {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Renderer for VecImage {
     fn new_image(&mut self, _name: &str, w: i64, h: i64) {
         self.w = w;
@@ -173,23 +180,27 @@ impl Renderer for VecImage {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 struct EmptyRenderer {}
 
+#[cfg(target_arch = "wasm32")]
 impl EmptyRenderer {
     fn new() -> EmptyRenderer {
         EmptyRenderer {}
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 impl Renderer for EmptyRenderer {
-    fn new_image(&mut self, _name: &str, w: i64, h: i64) {}
-    fn push_pixel(&mut self, p: Pixel) {}
+    fn new_image(&mut self, _name: &str, _w: i64, _h: i64) {}
+    fn push_pixel(&mut self, _p: Pixel) {}
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     amb: Vec3,
-    lights: Vec<Box<Light>>,
+    lights: &[Box<Light>],
     scene: Box<Node>,
     depth: i64,
     fov: f64,
@@ -200,7 +211,7 @@ pub fn render(
     println!("render to filename: {:?}", filename);
     let mut image = VecImage::new();
     image.new_image(filename, w, h);
-    render_pixels(amb, lights, scene, depth, fov, w, h, &mut image);
+    render_pixels(amb, &lights, scene, depth, fov, w, h, &mut image);
     write_ppm_file(&image.pixels(), w, h, filename).expect("failed to write file");
 }
 
@@ -213,9 +224,10 @@ lazy_static! {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     amb: Vec3,
-    lights: Vec<Box<Light>>,
+    lights: &[Box<Light>],
     scene: Box<Node>,
     depth: i64,
     fov: f64,
@@ -228,41 +240,48 @@ pub fn render(
     render_pixels(amb, lights, scene, depth, fov, w, h, &mut **renderer);
 }
 
-#[test]
-fn test_normalize() {
-    assert_eq!(normalize([7.0, 0.0, 0.0]), [1.0, 0.0, 0.0]);
-}
-
-#[test]
-fn test_ppm() {
-    let mut pixels = Vec::new();
-    for y in 0..256 {
-        for x in 0..256 {
-            pixels.push([
-                x as f64 / 255.0,
-                y as f64 / 255.0,
-                (x + y) as f64 / (2.0 * 255.0),
-            ]);
-        }
-    }
-    write_ppm_file(&pixels, 256, 256, "test.ppm").expect("failed to write file");
-}
-
 #[cfg(test)]
-fn render_scene(lights: Vec<Box<Light>>, mut scene: Box<Node>, name: &str) {
-    scene.translate(0.0, 0.0, 3.0);
-    render([1.0, 1.0, 1.0], lights, scene, 3, 90.0, 256, 256, name);
-}
+mod test {
+    use super::*;
+    use lights::{DirectionalLight};
+    use primitives::Sphere;
+    use std::rc::Rc;
 
-#[test]
-fn test_raytrace() {
-    let mut lights: Vec<Box<Light>> = Vec::new();
-    lights.push(Box::new(DirectionalLight::new(
-        [1.0, 0.0, 0.0],
-        [0.3, 0.4, 0.5],
-    )));
-    let scene = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| {
-        ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)
-    }))));
-    render_scene(lights, scene, "scene_sphere.ppm");
+    #[test]
+    fn test_normalize() {
+        assert_eq!(normalize([7.0, 0.0, 0.0]), [1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_ppm() {
+        let mut pixels = Vec::new();
+        for y in 0..256 {
+            for x in 0..256 {
+                pixels.push([
+                    x as f64 / 255.0,
+                    y as f64 / 255.0,
+                    (x + y) as f64 / (2.0 * 255.0),
+                ]);
+            }
+        }
+        write_ppm_file(&pixels, 256, 256, "test.ppm").expect("failed to write file");
+    }
+
+    fn render_scene(lights: &[Box<Light>], mut scene: Box<Node>, name: &str) {
+        scene.translate(0.0, 0.0, 3.0);
+        render([1.0, 1.0, 1.0], lights, scene, 3, 90.0, 256, 256, name);
+    }
+
+    #[test]
+    fn test_raytrace() {
+        let mut lights: Vec<Box<Light>> = Vec::new();
+        lights.push(Box::new(DirectionalLight::new(
+            [1.0, 0.0, 0.0],
+            [0.3, 0.4, 0.5],
+        )));
+        let scene = Box::new(Sphere::new(Rc::new(Box::new(|_face, _u, _v| {
+            ([1.0, 0.0, 0.0], 0.9, 0.9, 0.9)
+        }))));
+        render_scene(&lights, scene, "scene_sphere.ppm");
+    }
 }

@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::error::Error as StdError;
 use std::fmt;
-use std::fmt::Debug;
 use std::iter;
 use std::mem;
 use std::rc::Rc;
@@ -21,7 +20,7 @@ pub enum PrimitivesError {
 
 impl fmt::Display for PrimitivesError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return f.write_str(self.description());
+        f.write_str(self.description())
     }
 }
 
@@ -48,8 +47,8 @@ impl Clone for PrimitiveId {
 pub trait Primitive {
     fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError>;
     fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError>;
-    fn get_transform<'a>(&'a self) -> &'a Transform;
-    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform;
+    fn get_transform(&self) -> &Transform;
+    fn get_mut_transform(&mut self) -> &mut Transform;
     fn transform_point(&self, p: Vec3) -> Vec3 {
         self.get_transform().transform_point(p)
     }
@@ -117,7 +116,6 @@ pub enum IntersectionType {
 
 #[derive(Copy, Clone)]
 pub struct Intersection {
-    scale: f64,
     odistance: f64,
     pub distance: f64,
     rp: Vec3,
@@ -151,15 +149,14 @@ impl Intersection {
         face: i64,
     ) -> Intersection {
         Intersection {
-            scale: scale,
-            odistance: odistance,
+            odistance,
             distance: scale * odistance,
-            rp: rp,
-            rd: rd,
-            primitive_id: primitive_id,
-            t: t,
+            rp,
+            rd,
+            primitive_id,
+            t,
             original_t: t,
-            face: face,
+            face,
         }
     }
 
@@ -199,22 +196,22 @@ fn difference(a: bool, b: bool) -> bool {
 impl Operator {
     pub fn make_union(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
         Operator {
-            obj1: obj1,
-            obj2: obj2,
+            obj1,
+            obj2,
             rule: &union,
         }
     }
     pub fn make_intersect(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
         Operator {
-            obj1: obj1,
-            obj2: obj2,
+            obj1,
+            obj2,
             rule: &intersect,
         }
     }
     pub fn make_difference(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
         Operator {
-            obj1: obj1,
-            obj2: obj2,
+            obj1,
+            obj2,
             rule: &difference,
         }
     }
@@ -286,16 +283,16 @@ impl IntersectRay for Operator {
             match i.t {
                 IntersectionType::Entry => {
                     if *obj == 1 {
-                        inside1 = inside1 + 1;
+                        inside1 += 1;
                     } else {
-                        inside2 = inside2 + 1;
+                        inside2 += 1;
                     }
                 }
                 IntersectionType::Exit => {
                     if *obj == 1 {
-                        inside1 = inside1 - 1;
+                        inside1 -= 1;
                     } else {
-                        inside2 = inside2 - 1;
+                        inside2 -= 1;
                     }
                 }
             }
@@ -325,10 +322,12 @@ impl IntersectRay for Operator {
     }
 }
 
+type SurfaceFunction = Fn(i64, f64, f64) -> (Vec3, f64, f64, f64);
+
 #[derive(Clone)]
 pub struct PrimitiveCommon {
     transform: Transform,
-    surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>,
+    surface: Rc<Box<SurfaceFunction>>,
     id: PrimitiveId,
 }
 
@@ -336,10 +335,10 @@ pub struct PrimitiveCommon {
 pub struct Sphere(PrimitiveCommon);
 
 impl Sphere {
-    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Sphere {
+    pub fn new(surface: Rc<Box<SurfaceFunction>>) -> Sphere {
         Sphere(PrimitiveCommon {
             transform: Default::default(),
-            surface: surface,
+            surface,
             id: PrimitiveId::new(),
         })
     }
@@ -407,6 +406,7 @@ impl IntersectRay for Sphere {
 }
 
 impl Primitive for Sphere {
+    #[allow(clippy::many_single_char_names)]
     fn get_surface(&self, opos: Vec3, face: i64) -> Result<(Vec3, f64, f64, f64), PrimitivesError> {
         let [x, y, z] = opos;
         let v = (y + 1.0) / 2.0;
@@ -426,10 +426,10 @@ impl Primitive for Sphere {
         }
     }
 
-    fn get_transform<'a>(&'a self) -> &'a Transform {
+    fn get_transform(&self) -> &Transform {
         &self.0.transform
     }
-    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+    fn get_mut_transform(&mut self) -> &mut Transform {
         &mut self.0.transform
     }
 }
@@ -448,10 +448,10 @@ static SLABS: [(i64, i64); 3] = [(3, 2), (4, 5), (1, 0)];
 pub struct Cube(PrimitiveCommon);
 
 impl Cube {
-    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cube {
+    pub fn new(surface: Rc<Box<SurfaceFunction>>) -> Cube {
         Cube(PrimitiveCommon {
             transform: Default::default(),
-            surface: surface,
+            surface,
             id: PrimitiveId::new(),
         })
     }
@@ -496,7 +496,7 @@ impl IntersectRay for Cube {
                     _ => Some((t2, face2)),
                 };
                 match (tmin, tmax) {
-                    (Some(a), Some(b)) if a.0 > b.0 => return vec![],
+                    (Some(tminv), Some(tmaxv)) if tminv.0 > tmaxv.0 => return vec![],
                     _ => {}
                 }
                 match tmax {
@@ -561,7 +561,7 @@ impl Primitive for Cube {
         }
     }
 
-    fn get_normal(&self, p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
+    fn get_normal(&self, _p: Vec3, face: i64) -> Result<Vec3, PrimitivesError> {
         if face >= 0 && (face as usize) < NORMALS.len() {
             Ok(normalize(
                 self.0.transform.transform_normal(NORMALS[face as usize]),
@@ -571,10 +571,10 @@ impl Primitive for Cube {
         }
     }
 
-    fn get_transform<'a>(&'a self) -> &'a Transform {
+    fn get_transform(&self) -> &Transform {
         &self.0.transform
     }
-    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+    fn get_mut_transform(&mut self) -> &mut Transform {
         &mut self.0.transform
     }
 }
@@ -583,10 +583,10 @@ impl Primitive for Cube {
 pub struct Cylinder(PrimitiveCommon);
 
 impl Cylinder {
-    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cylinder {
+    pub fn new(surface: Rc<Box<SurfaceFunction>>) -> Cylinder {
         Cylinder(PrimitiveCommon {
             transform: Default::default(),
-            surface: surface,
+            surface,
             id: PrimitiveId::new(),
         })
     }
@@ -647,7 +647,7 @@ impl IntersectRay for Cylinder {
 
         let [px, py, pz] = raypos;
         let [dx, dy, dz] = raydir;
-        let mut ts = ((0.0, 0), (0.0, 0));
+        let ts;
         if dy.abs() + eps >= 1.0 {
             // ray is parallel to the cylinder axis
             let frsd = 1.0 - px * px - pz * pz;
@@ -749,10 +749,10 @@ impl Primitive for Cylinder {
         Ok(normalize(self.0.transform.transform_normal(n?)))
     }
 
-    fn get_transform<'a>(&'a self) -> &'a Transform {
+    fn get_transform(&self) -> &Transform {
         &self.0.transform
     }
-    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+    fn get_mut_transform(&mut self) -> &mut Transform {
         &mut self.0.transform
     }
 }
@@ -761,10 +761,10 @@ impl Primitive for Cylinder {
 pub struct Cone(PrimitiveCommon);
 
 impl Cone {
-    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Cone {
+    pub fn new(surface: Rc<Box<SurfaceFunction>>) -> Cone {
         Cone(PrimitiveCommon {
             transform: Default::default(),
-            surface: surface,
+            surface,
             id: PrimitiveId::new(),
         })
     }
@@ -815,7 +815,6 @@ impl IntersectRay for Cone {
         let scale = 1.0 / length(raydir);
         raydir = mul(raydir, scale); // normalize
         let raypos = tr.inv_transform_point(in_raypos);
-        let eps = 1e-7;
 
         let [px, py, pz] = raypos;
         let [dx, dy, dz] = raydir;
@@ -830,7 +829,7 @@ impl IntersectRay for Cone {
             if 0.0 <= cmaxy && cmaxy <= 1.0 {
                 ts.push(tcmax)
             }
-            if ts.len() == 0 {
+            if ts.is_empty() {
                 return vec![];
             }
             if ts.len() == 2 {
@@ -920,10 +919,10 @@ impl Primitive for Cone {
         Ok(normalize(self.0.transform.transform_normal(n?)))
     }
 
-    fn get_transform<'a>(&'a self) -> &'a Transform {
+    fn get_transform(&self) -> &Transform {
         &self.0.transform
     }
-    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+    fn get_mut_transform(&mut self) -> &mut Transform {
         &mut self.0.transform
     }
 }
@@ -932,10 +931,10 @@ impl Primitive for Cone {
 pub struct Plane(PrimitiveCommon);
 
 impl Plane {
-    pub fn new(surface: Rc<Box<Fn(i64, f64, f64) -> (Vec3, f64, f64, f64)>>) -> Self {
+    pub fn new(surface: Rc<Box<SurfaceFunction>>) -> Self {
         Plane(PrimitiveCommon {
             transform: Default::default(),
-            surface: surface,
+            surface,
             id: PrimitiveId::new(),
         })
     }
@@ -1013,10 +1012,10 @@ impl Primitive for Plane {
         }
     }
 
-    fn get_transform<'a>(&'a self) -> &'a Transform {
+    fn get_transform(&self) -> &Transform {
         &self.0.transform
     }
-    fn get_mut_transform<'a>(&'a mut self) -> &'a mut Transform {
+    fn get_mut_transform(&mut self) -> &mut Transform {
         &mut self.0.transform
     }
 }

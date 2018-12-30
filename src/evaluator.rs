@@ -28,16 +28,16 @@ pub enum Value {
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Value::ValNode(_) => write!(f, "ValNode"),
-            &Value::ValLight(_) => write!(f, "ValLight"),
-            &Value::ValClosure(_, _) => write!(f, "ValClosure"),
-            &Value::ValBoolean(x) => write!(f, "ValBoolean {{ {} }}", x),
-            &Value::ValReal(x) => write!(f, "ValReal {{ {} }}", x),
-            &Value::ValInteger(x) => write!(f, "ValInteger {{ {} }}", x),
-            &Value::ValString(ref x) => write!(f, "ValString {{ {} }}", x),
-            &Value::ValArray(ref x) => write!(f, "ValArray {{ {:?} }}", x),
-            &Value::ValPoint(ref x) => write!(f, "ValPoint {{ {:?} }}", x),
+        match *self {
+            Value::ValNode(_) => write!(f, "ValNode"),
+            Value::ValLight(_) => write!(f, "ValLight"),
+            Value::ValClosure(_, _) => write!(f, "ValClosure"),
+            Value::ValBoolean(x) => write!(f, "ValBoolean {{ {} }}", x),
+            Value::ValReal(x) => write!(f, "ValReal {{ {} }}", x),
+            Value::ValInteger(x) => write!(f, "ValInteger {{ {} }}", x),
+            Value::ValString(ref x) => write!(f, "ValString {{ {} }}", x),
+            Value::ValArray(ref x) => write!(f, "ValArray {{ {:?} }}", x),
+            Value::ValPoint(ref x) => write!(f, "ValPoint {{ {:?} }}", x),
         }
     }
 }
@@ -123,7 +123,7 @@ pub type Env = SnapMap<String, Value>;
 pub type Stack = Vec<Value>;
 
 fn pop(stack: &mut Stack) -> Result<Value, EvalError> {
-    return stack.pop().ok_or(EvalError::EmptyStack);
+    stack.pop().ok_or(EvalError::EmptyStack)
 }
 
 #[derive(Debug)]
@@ -138,7 +138,7 @@ pub enum EvalError {
 
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return f.write_str(self.description());
+        f.write_str(self.description())
     }
 }
 
@@ -162,57 +162,57 @@ impl From<parser::ParseError> for EvalError {
 }
 
 fn eval_op(op: &tokenizer::Ops, stack: &mut Stack) -> Result<(), EvalError> {
-    match op {
-        &tokenizer::Ops::OpAddi => eval_addi(stack),
-        &tokenizer::Ops::OpAddf => eval_addf(stack),
-        &tokenizer::Ops::OpApply => eval_apply(stack),
-        &tokenizer::Ops::OpAcos => eval_acos(stack),
-        &tokenizer::Ops::OpAsin => eval_asin(stack),
-        &tokenizer::Ops::OpClampf => eval_clampf(stack),
-        &tokenizer::Ops::OpCos => eval_cos(stack),
-        &tokenizer::Ops::OpDivf => eval_divf(stack),
-        &tokenizer::Ops::OpDivi => eval_divi(stack),
-        &tokenizer::Ops::OpEqi => eval_eqi(stack),
-        &tokenizer::Ops::OpEqf => eval_eqf(stack),
-        &tokenizer::Ops::OpFloor => eval_floor(stack),
-        &tokenizer::Ops::OpFrac => eval_frac(stack),
-        &tokenizer::Ops::OpGet => eval_get(stack),
-        &tokenizer::Ops::OpGetx => eval_getx(stack),
-        &tokenizer::Ops::OpGety => eval_gety(stack),
-        &tokenizer::Ops::OpGetz => eval_getz(stack),
-        &tokenizer::Ops::OpIf => eval_if(stack),
-        &tokenizer::Ops::OpLength => eval_length(stack),
-        &tokenizer::Ops::OpLessi => eval_lessi(stack),
-        &tokenizer::Ops::OpLessf => eval_lessf(stack),
-        &tokenizer::Ops::OpLight => eval_light(stack),
-        &tokenizer::Ops::OpModi => eval_modi(stack),
-        &tokenizer::Ops::OpMuli => eval_muli(stack),
-        &tokenizer::Ops::OpMulf => eval_mulf(stack),
-        &tokenizer::Ops::OpNegi => eval_negi(stack),
-        &tokenizer::Ops::OpPoint => eval_point(stack),
-        &tokenizer::Ops::OpNegf => eval_negf(stack),
-        &tokenizer::Ops::OpReal => eval_real(stack),
-        &tokenizer::Ops::OpRender => eval_render(stack),
-        &tokenizer::Ops::OpSin => eval_sin(stack),
-        &tokenizer::Ops::OpSphere => eval_sphere(stack),
-        &tokenizer::Ops::OpSqrt => eval_sqrt(stack),
-        &tokenizer::Ops::OpSubi => eval_subi(stack),
-        &tokenizer::Ops::OpSubf => eval_subf(stack),
-        &tokenizer::Ops::OpTranslate => eval_translate(stack),
-        &tokenizer::Ops::OpScale => eval_scale(stack),
-        &tokenizer::Ops::OpUscale => eval_uscale(stack),
-        &tokenizer::Ops::OpRotatex => eval_rotatex(stack),
-        &tokenizer::Ops::OpRotatey => eval_rotatey(stack),
-        &tokenizer::Ops::OpRotatez => eval_rotatez(stack),
-        &tokenizer::Ops::OpUnion => eval_union(stack),
-        &tokenizer::Ops::OpIntersect => eval_intersect(stack),
-        &tokenizer::Ops::OpDifference => eval_difference(stack),
-        &tokenizer::Ops::OpPlane => eval_plane(stack),
-        &tokenizer::Ops::OpPointlight => eval_pointlight(stack),
-        &tokenizer::Ops::OpSpotlight => eval_spotlight(stack),
-        &tokenizer::Ops::OpCube => eval_cube(stack),
-        &tokenizer::Ops::OpCylinder => eval_cylinder(stack),
-        &tokenizer::Ops::OpCone => eval_cone(stack),
+    match *op {
+        tokenizer::Ops::OpAddi => eval_addi(stack),
+        tokenizer::Ops::OpAddf => eval_addf(stack),
+        tokenizer::Ops::OpApply => eval_apply(stack),
+        tokenizer::Ops::OpAcos => eval_acos(stack),
+        tokenizer::Ops::OpAsin => eval_asin(stack),
+        tokenizer::Ops::OpClampf => eval_clampf(stack),
+        tokenizer::Ops::OpCos => eval_cos(stack),
+        tokenizer::Ops::OpDivf => eval_divf(stack),
+        tokenizer::Ops::OpDivi => eval_divi(stack),
+        tokenizer::Ops::OpEqi => eval_eqi(stack),
+        tokenizer::Ops::OpEqf => eval_eqf(stack),
+        tokenizer::Ops::OpFloor => eval_floor(stack),
+        tokenizer::Ops::OpFrac => eval_frac(stack),
+        tokenizer::Ops::OpGet => eval_get(stack),
+        tokenizer::Ops::OpGetx => eval_getx(stack),
+        tokenizer::Ops::OpGety => eval_gety(stack),
+        tokenizer::Ops::OpGetz => eval_getz(stack),
+        tokenizer::Ops::OpIf => eval_if(stack),
+        tokenizer::Ops::OpLength => eval_length(stack),
+        tokenizer::Ops::OpLessi => eval_lessi(stack),
+        tokenizer::Ops::OpLessf => eval_lessf(stack),
+        tokenizer::Ops::OpLight => eval_light(stack),
+        tokenizer::Ops::OpModi => eval_modi(stack),
+        tokenizer::Ops::OpMuli => eval_muli(stack),
+        tokenizer::Ops::OpMulf => eval_mulf(stack),
+        tokenizer::Ops::OpNegi => eval_negi(stack),
+        tokenizer::Ops::OpPoint => eval_point(stack),
+        tokenizer::Ops::OpNegf => eval_negf(stack),
+        tokenizer::Ops::OpReal => eval_real(stack),
+        tokenizer::Ops::OpRender => eval_render(stack),
+        tokenizer::Ops::OpSin => eval_sin(stack),
+        tokenizer::Ops::OpSphere => eval_sphere(stack),
+        tokenizer::Ops::OpSqrt => eval_sqrt(stack),
+        tokenizer::Ops::OpSubi => eval_subi(stack),
+        tokenizer::Ops::OpSubf => eval_subf(stack),
+        tokenizer::Ops::OpTranslate => eval_translate(stack),
+        tokenizer::Ops::OpScale => eval_scale(stack),
+        tokenizer::Ops::OpUscale => eval_uscale(stack),
+        tokenizer::Ops::OpRotatex => eval_rotatex(stack),
+        tokenizer::Ops::OpRotatey => eval_rotatey(stack),
+        tokenizer::Ops::OpRotatez => eval_rotatez(stack),
+        tokenizer::Ops::OpUnion => eval_union(stack),
+        tokenizer::Ops::OpIntersect => eval_intersect(stack),
+        tokenizer::Ops::OpDifference => eval_difference(stack),
+        tokenizer::Ops::OpPlane => eval_plane(stack),
+        tokenizer::Ops::OpPointlight => eval_pointlight(stack),
+        tokenizer::Ops::OpSpotlight => eval_spotlight(stack),
+        tokenizer::Ops::OpCube => eval_cube(stack),
+        tokenizer::Ops::OpCylinder => eval_cylinder(stack),
+        tokenizer::Ops::OpCone => eval_cone(stack),
     }
 }
 
@@ -225,48 +225,42 @@ fn modi(a: i64, b: i64) -> i64 {
 }
 
 fn get_integer(v: &Value) -> Result<i64, EvalError> {
-    match v {
-        &Value::ValInteger(i) => Ok(i),
+    match *v {
+        Value::ValInteger(i) => Ok(i),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn get_string(v: &Value) -> Result<&String, EvalError> {
-    match v {
-        &Value::ValString(ref i) => Ok(&i),
+    match *v {
+        Value::ValString(ref i) => Ok(&i),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn get_real(v: &Value) -> Result<f64, EvalError> {
-    match v {
-        &Value::ValReal(f) => Ok(f),
+    match *v {
+        Value::ValReal(f) => Ok(f),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
 
 fn get_boolean(v: &Value) -> Result<bool, EvalError> {
-    match v {
-        &Value::ValBoolean(b) => Ok(b),
+    match *v {
+        Value::ValBoolean(b) => Ok(b),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
 
+#[allow(clippy::ptr_arg)]
 fn make_array(s: &Stack) -> Value {
-    let mut tmp = s.clone();
+    let mut tmp = s.to_owned();
     tmp.reverse();
     Value::ValArray(tmp)
 }
 
-fn get_point(v: &Value) -> Result<&vecmath::Vec3, EvalError> {
-    match v {
-        &Value::ValPoint(ref p) => Ok(&p),
-        _ => Err(EvalError::WrongTypeRef),
-    }
-}
-
-fn move_point(v: Value) -> Result<vecmath::Vec3, EvalError> {
-    match v {
+fn get_point(v: &Value) -> Result<vecmath::Vec3, EvalError> {
+    match *v {
         Value::ValPoint(p) => Ok(p),
         _ => Err(EvalError::WrongTypeRef),
     }
@@ -297,12 +291,18 @@ fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
     let pred = pop(stack)?;
     if get_boolean(&pred)? {
         match c1 {
-            Value::ValClosure(mut e, f) => Ok(do_evaluate(&mut e, stack, &f)?),
+            Value::ValClosure(mut e, f) => {
+                do_evaluate(&mut e, stack, &f)?;
+                Ok(())
+            }
             other => Err(EvalError::WrongType(other)),
         }
     } else {
         match c2 {
-            Value::ValClosure(mut e, f) => Ok(do_evaluate(&mut e, stack, &f)?),
+            Value::ValClosure(mut e, f) => {
+                do_evaluate(&mut e, stack, &f)?;
+                Ok(())
+            }
             other => Err(EvalError::WrongType(other)),
         }
     }
@@ -311,7 +311,10 @@ fn eval_if(stack: &mut Stack) -> Result<(), EvalError> {
 fn eval_apply(stack: &mut Stack) -> Result<(), EvalError> {
     let c = pop(stack)?;
     match c {
-        Value::ValClosure(mut e, f) => Ok(do_evaluate(&mut e, stack, &f)?),
+        Value::ValClosure(mut e, f) => {
+            do_evaluate(&mut e, stack, &f)?;
+            Ok(())
+        }
         other => Err(EvalError::WrongType(other)),
     }
 }
@@ -380,6 +383,7 @@ fn eval_eqi(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
+#[allow(clippy::float_cmp)]
 fn eval_eqf(stack: &mut Stack) -> Result<(), EvalError> {
     let r2 = pop(stack)?;
     let r1 = pop(stack)?;
@@ -525,8 +529,8 @@ fn eval_getz(stack: &mut Stack) -> Result<(), EvalError> {
 }
 
 fn get_array(v: &Value) -> Result<&Vec<Value>, EvalError> {
-    match v {
-        &Value::ValArray(ref a) => Ok(a),
+    match *v {
+        Value::ValArray(ref a) => Ok(a),
         _ => Err(EvalError::WrongTypeRef),
     }
 }
@@ -717,8 +721,8 @@ fn eval_light(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let d = pop(stack)?;
     stack.push(Value::ValLight(Box::new(lights::DirectionalLight::new(
-        move_point(d)?,
-        move_point(color)?,
+        get_point(&d)?,
+        get_point(&color)?,
     ))));
     Ok(())
 }
@@ -727,8 +731,8 @@ fn eval_pointlight(stack: &mut Stack) -> Result<(), EvalError> {
     let color = pop(stack)?;
     let p = pop(stack)?;
     stack.push(Value::ValLight(Box::new(lights::PointLight::new(
-        move_point(p)?,
-        move_point(color)?,
+        get_point(&p)?,
+        get_point(&color)?,
     ))));
     Ok(())
 }
@@ -740,9 +744,9 @@ fn eval_spotlight(stack: &mut Stack) -> Result<(), EvalError> {
     let at = pop(stack)?;
     let pos = pop(stack)?;
     stack.push(Value::ValLight(Box::new(lights::SpotLight::new(
-        move_point(pos)?,
-        move_point(at)?,
-        move_point(color)?,
+        get_point(&pos)?,
+        get_point(&at)?,
+        get_point(&color)?,
         get_real(&cutoff)?,
         get_real(&exp)?,
     ))));
@@ -759,8 +763,8 @@ fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     let lights = pop(stack)?;
     let amb = pop(stack)?;
     raytracer::render(
-        move_point(amb)?,
-        move_lights(lights)?,
+        get_point(&amb)?,
+        &move_lights(lights)?,
         move_node(obj)?,
         get_integer(&depth)?,
         get_real(&fov)?,
@@ -771,10 +775,10 @@ fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
+type SurfaceFunction = Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64);
+
 // Let's move into here, to avoid one clone
-fn move_surface(
-    v: Value,
-) -> Result<Rc<Box<Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64)>>, EvalError> {
+fn move_surface(v: Value) -> Result<Rc<Box<SurfaceFunction>>, EvalError> {
     match v {
         Value::ValClosure(env, ast) => Ok(Rc::new(Box::new(
             move |face: i64, u: f64, v: f64| -> (vecmath::Vec3, f64, f64, f64) {
@@ -791,7 +795,7 @@ fn move_surface(
                 let rkd = get_real(&kd).expect("not a real");
                 let rks = get_real(&ks).expect("not a real");
                 let rn = get_real(&n).expect("not a real");
-                (move_point(sc).expect("wrong type"), rkd, rks, rn)
+                (get_point(&sc).expect("wrong type"), rkd, rks, rn)
             },
         ))),
         _ => Err(EvalError::WrongTypeRef),
@@ -799,33 +803,33 @@ fn move_surface(
 }
 
 fn do_evaluate(env: &mut Env, stack: &mut Stack, ast: &[parser::AstNode]) -> Result<(), EvalError> {
-    for i in 0..ast.len() {
-        match &ast[i] {
-            &parser::AstNode::Function(ref v) => {
+    for item in ast {
+        match *item {
+            parser::AstNode::Function(ref v) => {
                 stack.push(Value::ValClosure(env.snapshot(), v.clone()));
             }
-            &parser::AstNode::Array(ref v) => {
+            parser::AstNode::Array(ref v) => {
                 let mut local_stack = Stack::new();
                 do_evaluate(env, &mut local_stack, v)?;
                 stack.push(make_array(&local_stack));
             }
-            &parser::AstNode::Leaf(ref t) => {
-                match t {
-                    &tokenizer::Token::Integer(v) => stack.push(Value::ValInteger(v)),
-                    &tokenizer::Token::Real(v) => stack.push(Value::ValReal(v)),
-                    &tokenizer::Token::Boolean(v) => stack.push(Value::ValBoolean(v)),
-                    &tokenizer::Token::Str(ref v) => stack.push(Value::ValString(v.clone())),
-                    &tokenizer::Token::Binder(ref v) => {
+            parser::AstNode::Leaf(ref t) => {
+                match *t {
+                    tokenizer::Token::Integer(v) => stack.push(Value::ValInteger(v)),
+                    tokenizer::Token::Real(v) => stack.push(Value::ValReal(v)),
+                    tokenizer::Token::Boolean(v) => stack.push(Value::ValBoolean(v)),
+                    tokenizer::Token::Str(ref v) => stack.push(Value::ValString(v.clone())),
+                    tokenizer::Token::Binder(ref v) => {
                         let i = stack.pop().expect("empty stack");
                         env.insert(v.clone(), i);
                     }
-                    &tokenizer::Token::Identifier(ref v) => {
+                    tokenizer::Token::Identifier(ref v) => {
                         let val = env.get(v).expect("environment missing identifier");
                         //                 if isinstance(e, primitives.Node):
                         //                     e = copy.deepcopy(e)
                         stack.push(val.clone())
                     }
-                    &tokenizer::Token::Operator(ref v) => {
+                    tokenizer::Token::Operator(ref v) => {
                         eval_op(v, stack).expect("error evaluation op");
                     }
                     _ => {
@@ -1038,7 +1042,7 @@ mod tests {
     fn test_sphere() {
         let (env, _) = run("1.0 { /x x } sphere /x").expect("error");
         match env.get("x").expect("error") {
-            &Value::ValNode(ref x) => assert!(true),
+            &Value::ValNode(ref _x) => assert!(true),
             _ => assert!(false),
         }
     }

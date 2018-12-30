@@ -1,3 +1,4 @@
+#[cfg(target_arch = "wasm32")]
 #[macro_use]
 extern crate lazy_static;
 
@@ -12,8 +13,9 @@ mod vecmath;
 
 pub mod render {
     use evaluator;
+
+    #[cfg(target_arch = "wasm32")]
     use raytracer;
-    use std::rc::Rc;
 
     pub use raytracer::Pixel;
     pub use raytracer::Renderer;

@@ -16,10 +16,11 @@ pub mod render {
 
     #[cfg(target_arch = "wasm32")]
     use raytracer;
+    #[cfg(target_arch = "wasm32")]
+    pub use raytracer::RendererFactory;
 
     pub use raytracer::Pixel;
     pub use raytracer::Renderer;
-    pub use raytracer::RendererFactory;
 
     #[cfg(target_arch = "wasm32")]
     pub fn set_renderer_factory(renderer_factory: Box<raytracer::RendererFactory>) {

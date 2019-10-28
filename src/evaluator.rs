@@ -22,8 +22,8 @@ pub enum Value {
     ValInteger(i64),
     ValString(String),
     ValPoint(vecmath::Vec3),
-    ValNode(Box<primitives::Node>),
-    ValLight(Box<lights::Light>),
+    ValNode(Box<dyn primitives::Node>),
+    ValLight(Box<dyn lights::Light>),
 }
 
 impl fmt::Debug for Value {
@@ -278,7 +278,7 @@ fn get_point_z(v: &Value) -> Result<f64, EvalError> {
     Ok(get_point(v)?[2])
 }
 
-fn move_node(v: Value) -> Result<Box<primitives::Node>, EvalError> {
+fn move_node(v: Value) -> Result<Box<dyn primitives::Node>, EvalError> {
     match v {
         Value::ValNode(n) => Ok(n),
         _ => Err(EvalError::WrongTypeRef),
@@ -535,7 +535,7 @@ fn get_array(v: &Value) -> Result<&Vec<Value>, EvalError> {
     }
 }
 
-fn move_lights(v: Value) -> Result<Vec<Box<lights::Light>>, EvalError> {
+fn move_lights(v: Value) -> Result<Vec<Box<dyn lights::Light>>, EvalError> {
     match v {
         Value::ValArray(a) => a
             .into_iter()
@@ -775,7 +775,7 @@ fn eval_render(stack: &mut Stack) -> Result<(), EvalError> {
     Ok(())
 }
 
-type SurfaceFunction = Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64);
+type SurfaceFunction = dyn Fn(i64, f64, f64) -> (vecmath::Vec3, f64, f64, f64);
 
 // Let's move into here, to avoid one clone
 fn move_surface(v: Value) -> Result<Rc<Box<SurfaceFunction>>, EvalError> {

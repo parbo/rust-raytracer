@@ -164,17 +164,17 @@ fn boolean_tokenizer(a: &str) -> Option<Result> {
 
 fn is_identifier_start(c: char) -> bool {
     match c {
-        'a'...'z' => true,
-        'A'...'Z' => true,
+        'a'..='z' => true,
+        'A'..='Z' => true,
         _ => false,
     }
 }
 
 fn is_identifier_rest(c: char) -> bool {
     match c {
-        '0'...'9' => true,
-        'a'...'z' => true,
-        'A'...'Z' => true,
+        '0'..='9' => true,
+        'a'..='z' => true,
+        'A'..='Z' => true,
         '-' => true,
         '_' => true,
         _ => false,
@@ -183,7 +183,7 @@ fn is_identifier_rest(c: char) -> bool {
 
 fn is_decimal_number(c: char) -> bool {
     match c {
-        '0'...'9' => true,
+        '0'..='9' => true,
         _ => false,
     }
 }

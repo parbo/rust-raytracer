@@ -44,8 +44,8 @@ fn get_specular(ic: Color, lightdir: Vec3, sn: Vec3, pos: Vec3, raypos: Vec3, n:
 
 fn trace(
     amb: Vec3,
-    lights: &[Box<Light>],
-    scene: &Node,
+    lights: &[Box<dyn Light>],
+    scene: &dyn Node,
     depth: i64,
     raypos: Vec3,
     raydir: Vec3,
@@ -120,8 +120,8 @@ pub trait Renderer {
 #[allow(clippy::needless_pass_by_value)]
 pub fn render_pixels(
     amb: Vec3,
-    lights: &[Box<Light>],
-    scene: Box<Node>,
+    lights: &[Box<dyn Light>],
+    scene: Box<dyn Node>,
     depth: i64,
     fov: f64,
     w: i64,
@@ -200,8 +200,8 @@ impl Renderer for EmptyRenderer {
 #[allow(clippy::too_many_arguments)]
 pub fn render(
     amb: Vec3,
-    lights: &[Box<Light>],
-    scene: Box<Node>,
+    lights: &[Box<dyn Light>],
+    scene: Box<dyn Node>,
     depth: i64,
     fov: f64,
     w: i64,
@@ -217,7 +217,7 @@ pub fn render(
 
 #[cfg(target_arch = "wasm32")]
 pub trait RendererFactory: Send {
-    fn create(&self) -> Box<Renderer>;
+    fn create(&self) -> Box<dyn Renderer>;
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -232,16 +232,16 @@ impl EmptyRendererFactory {
 
 #[cfg(target_arch = "wasm32")]
 impl RendererFactory for EmptyRendererFactory {
-    fn create(&self) -> Box<Renderer> {
+    fn create(&self) -> Box<dyn Renderer> {
         Box::new(EmptyRenderer::new())
     }
 }
 
 #[cfg(target_arch = "wasm32")]
 lazy_static! {
-    pub static ref RENDERER_FACTORY: Mutex<Box<RendererFactory>> = {
+    pub static ref RENDERER_FACTORY: Mutex<Box<dyn RendererFactory>> = {
         let vi = Box::new(EmptyRendererFactory::new());
-        Mutex::<Box<RendererFactory>>::new(vi)
+        Mutex::<Box<dyn RendererFactory>>::new(vi)
     };
 }
 
@@ -249,8 +249,8 @@ lazy_static! {
 #[allow(clippy::too_many_arguments)]
 pub fn render(
     amb: Vec3,
-    lights: &[Box<Light>],
-    scene: Box<Node>,
+    lights: &[Box<dyn Light>],
+    scene: Box<dyn Node>,
     depth: i64,
     fov: f64,
     w: i64,
@@ -289,14 +289,14 @@ mod test {
         write_ppm_file(&pixels, 256, 256, "test.ppm").expect("failed to write file");
     }
 
-    fn render_scene(lights: &[Box<Light>], mut scene: Box<Node>, name: &str) {
+    fn render_scene(lights: &[Box<dyn Light>], mut scene: Box<dyn Node>, name: &str) {
         scene.translate(0.0, 0.0, 3.0);
         render([1.0, 1.0, 1.0], lights, scene, 3, 90.0, 256, 256, name);
     }
 
     #[test]
     fn test_raytrace() {
-        let mut lights: Vec<Box<Light>> = Vec::new();
+        let mut lights: Vec<Box<dyn Light>> = Vec::new();
         lights.push(Box::new(DirectionalLight::new(
             [1.0, 0.0, 0.0],
             [0.3, 0.4, 0.5],

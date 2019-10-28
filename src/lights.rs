@@ -6,20 +6,20 @@ pub trait Light: LightClone {
 }
 
 pub trait LightClone {
-    fn clone_box(&self) -> Box<Light>;
+    fn clone_box(&self) -> Box<dyn Light>;
 }
 
 impl<T> LightClone for T
 where
     T: 'static + Light + Clone,
 {
-    fn clone_box(&self) -> Box<Light> {
+    fn clone_box(&self) -> Box<dyn Light> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<Light> {
-    fn clone(&self) -> Box<Light> {
+impl Clone for Box<dyn Light> {
+    fn clone(&self) -> Box<dyn Light> {
         self.clone_box()
     }
 }

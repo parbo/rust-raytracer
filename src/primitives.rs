@@ -8,7 +8,7 @@ use std::sync::atomic::{self, AtomicUsize};
 use transform::Transform;
 use vecmath::{add, dot, length, mul, neg, normalize, sub, Vec3};
 
-static PRIMITIVE_COUNTER: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+static PRIMITIVE_COUNTER: AtomicUsize = atomic::AtomicUsize::new(0);
 
 #[derive(Debug, PartialEq, Copy)]
 pub struct PrimitiveId(usize);
@@ -55,7 +55,7 @@ pub trait Primitive {
 }
 
 pub trait IntersectRay {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive>;
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive>;
     fn intersect(&self, raypos: Vec3, raydir: Vec3) -> Vec<Intersection>;
 }
 
@@ -69,20 +69,20 @@ pub trait Node: NodeClone + IntersectRay {
 }
 
 pub trait NodeClone {
-    fn clone_box(&self) -> Box<Node>;
+    fn clone_box(&self) -> Box<dyn Node>;
 }
 
 impl<T> NodeClone for T
 where
     T: 'static + Node + Clone,
 {
-    fn clone_box(&self) -> Box<Node> {
+    fn clone_box(&self) -> Box<dyn Node> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<Node> {
-    fn clone(&self) -> Box<Node> {
+impl Clone for Box<dyn Node> {
+    fn clone(&self) -> Box<dyn Node> {
         self.clone_box()
     }
 }
@@ -176,9 +176,9 @@ impl Intersection {
 
 #[derive(Clone)]
 pub struct Operator {
-    obj1: Box<Node>,
-    obj2: Box<Node>,
-    rule: &'static Fn(bool, bool) -> bool,
+    obj1: Box<dyn Node>,
+    obj2: Box<dyn Node>,
+    rule: &'static dyn Fn(bool, bool) -> bool,
 }
 
 fn union(a: bool, b: bool) -> bool {
@@ -194,21 +194,21 @@ fn difference(a: bool, b: bool) -> bool {
 }
 
 impl Operator {
-    pub fn make_union(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
+    pub fn make_union(obj1: Box<dyn Node>, obj2: Box<dyn Node>) -> Operator {
         Operator {
             obj1,
             obj2,
             rule: &union,
         }
     }
-    pub fn make_intersect(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
+    pub fn make_intersect(obj1: Box<dyn Node>, obj2: Box<dyn Node>) -> Operator {
         Operator {
             obj1,
             obj2,
             rule: &intersect,
         }
     }
-    pub fn make_difference(obj1: Box<Node>, obj2: Box<Node>) -> Operator {
+    pub fn make_difference(obj1: Box<dyn Node>, obj2: Box<dyn Node>) -> Operator {
         Operator {
             obj1,
             obj2,
@@ -245,7 +245,7 @@ impl Node for Operator {
 }
 
 impl IntersectRay for Operator {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive> {
         if let Some(n) = self.obj1.find_primitive(id) {
             Some(n)
         } else if let Some(n) = self.obj2.find_primitive(id) {
@@ -322,7 +322,7 @@ impl IntersectRay for Operator {
     }
 }
 
-type SurfaceFunction = Fn(i64, f64, f64) -> (Vec3, f64, f64, f64);
+type SurfaceFunction = dyn Fn(i64, f64, f64) -> (Vec3, f64, f64, f64);
 
 #[derive(Clone)]
 pub struct PrimitiveCommon {
@@ -345,7 +345,7 @@ impl Sphere {
 }
 
 impl IntersectRay for Sphere {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive> {
         if id == self.0.id {
             Some(self)
         } else {
@@ -458,7 +458,7 @@ impl Cube {
 }
 
 impl IntersectRay for Cube {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive> {
         if id == self.0.id {
             Some(self)
         } else {
@@ -629,7 +629,7 @@ impl Cylinder {
 }
 
 impl IntersectRay for Cylinder {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive> {
         if id == self.0.id {
             Some(self)
         } else {
@@ -801,7 +801,7 @@ impl Cone {
 }
 
 impl IntersectRay for Cone {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive> {
         if id == self.0.id {
             Some(self)
         } else {
@@ -941,7 +941,7 @@ impl Plane {
 }
 
 impl IntersectRay for Plane {
-    fn find_primitive(&self, id: PrimitiveId) -> Option<&Primitive> {
+    fn find_primitive(&self, id: PrimitiveId) -> Option<&dyn Primitive> {
         if id == self.0.id {
             Some(self)
         } else {

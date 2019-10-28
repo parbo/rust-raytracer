@@ -1,7 +1,3 @@
-#[cfg(target_arch = "wasm32")]
-#[macro_use]
-extern crate lazy_static;
-
 mod evaluator;
 mod lights;
 mod parser;
@@ -23,9 +19,10 @@ pub mod render {
     pub use raytracer::Renderer;
 
     #[cfg(target_arch = "wasm32")]
-    pub fn set_renderer_factory(renderer_factory: Box<raytracer::RendererFactory>) {
-        let mut r = raytracer::RENDERER_FACTORY.lock().unwrap();
-        *r = renderer_factory;
+    pub fn set_renderer_factory(renderer_factory: Box<dyn raytracer::RendererFactory>) {
+        raytracer::RENDERER_FACTORY.with(|r| {
+            *r.borrow_mut() = renderer_factory;
+        });
     }
 
     pub fn render_gml(gml: &str) {

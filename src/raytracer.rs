@@ -2,8 +2,7 @@ use lights::Light;
 use primitives::{IntersectionType, Node};
 use vecmath::{add, cmul, dot, mul, neg, normalize, sub, Vec3};
 
-#[cfg(target_arch = "wasm32")]
-use std::sync::Mutex;
+use std::cell::RefCell;
 
 pub type Pixel = [f64; 3];
 pub type Color = [f64; 3];
@@ -114,6 +113,7 @@ fn trace(
 pub trait Renderer {
     fn new_image(&mut self, name: &str, w: i64, h: i64);
     fn push_pixel(&mut self, pixel: Pixel);
+    fn done(&mut self);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -146,31 +146,27 @@ pub fn render_pixels(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 struct VecImage {
+    name: String,
     w: i64,
     h: i64,
     pixels: Vec<Pixel>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl VecImage {
     fn new() -> VecImage {
         VecImage {
+            name: "".to_string(),
             w: 0,
             h: 0,
             pixels: Vec::new(),
         }
     }
-
-    fn pixels(&self) -> &[Pixel] {
-        self.pixels.as_slice()
-    }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl Renderer for VecImage {
-    fn new_image(&mut self, _name: &str, w: i64, h: i64) {
+    fn new_image(&mut self, name: &str, w: i64, h: i64) {
+        self.name = name.to_string();
         self.w = w;
         self.h = h;
         self.pixels.resize((w * h) as usize, [0.0, 0.0, 0.0]);
@@ -178,74 +174,34 @@ impl Renderer for VecImage {
     fn push_pixel(&mut self, p: Pixel) {
         self.pixels.push(p);
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-struct EmptyRenderer {}
-
-#[cfg(target_arch = "wasm32")]
-impl EmptyRenderer {
-    fn new() -> EmptyRenderer {
-        EmptyRenderer {}
+    fn done(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        write_ppm_file(&self.pixels, self.w, self.h, &self.name).expect("failed to write file");
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-impl Renderer for EmptyRenderer {
-    fn new_image(&mut self, _name: &str, _w: i64, _h: i64) {}
-    fn push_pixel(&mut self, _p: Pixel) {}
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(clippy::too_many_arguments)]
-pub fn render(
-    amb: Vec3,
-    lights: &[Box<dyn Light>],
-    scene: Box<dyn Node>,
-    depth: i64,
-    fov: f64,
-    w: i64,
-    h: i64,
-    filename: &str,
-) {
-    println!("render to filename: {:?}", filename);
-    let mut image = VecImage::new();
-    image.new_image(filename, w, h);
-    render_pixels(amb, &lights, scene, depth, fov, w, h, &mut image);
-    write_ppm_file(&image.pixels(), w, h, filename).expect("failed to write file");
-}
-
-#[cfg(target_arch = "wasm32")]
-pub trait RendererFactory: Send {
+pub trait RendererFactory {
     fn create(&self) -> Box<dyn Renderer>;
 }
 
-#[cfg(target_arch = "wasm32")]
-struct EmptyRendererFactory {}
+struct DefaultRendererFactory {}
 
-#[cfg(target_arch = "wasm32")]
-impl EmptyRendererFactory {
-    fn new() -> EmptyRendererFactory {
-        EmptyRendererFactory {}
+impl DefaultRendererFactory {
+    fn new() -> DefaultRendererFactory {
+        DefaultRendererFactory {}
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-impl RendererFactory for EmptyRendererFactory {
+impl RendererFactory for DefaultRendererFactory {
     fn create(&self) -> Box<dyn Renderer> {
-        Box::new(EmptyRenderer::new())
+        Box::new(VecImage::new())
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-lazy_static! {
-    pub static ref RENDERER_FACTORY: Mutex<Box<dyn RendererFactory>> = {
-        let vi = Box::new(EmptyRendererFactory::new());
-        Mutex::<Box<dyn RendererFactory>>::new(vi)
-    };
+thread_local! {
+    pub static RENDERER_FACTORY: RefCell<Box<dyn RendererFactory>> = RefCell::new(Box::new(DefaultRendererFactory::new()))
 }
 
-#[cfg(target_arch = "wasm32")]
 #[allow(clippy::too_many_arguments)]
 pub fn render(
     amb: Vec3,
@@ -257,9 +213,11 @@ pub fn render(
     h: i64,
     filename: &str,
 ) {
-    let mut renderer = RENDERER_FACTORY.lock().unwrap().create();
-    renderer.new_image(filename, w, h);
-    render_pixels(amb, lights, scene, depth, fov, w, h, &mut *renderer);
+    RENDERER_FACTORY.with(|renderer_factory| {
+        let mut renderer = renderer_factory.borrow().create();
+        renderer.new_image(filename, w, h);
+        render_pixels(amb, lights, scene, depth, fov, w, h, &mut *renderer);
+    });
 }
 
 #[cfg(test)]

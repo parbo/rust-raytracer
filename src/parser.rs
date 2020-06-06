@@ -1,4 +1,3 @@
-use std::error::Error as StdError;
 use std::fmt;
 use tokenizer;
 
@@ -16,14 +15,8 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
-    }
-}
-
-impl StdError for ParseError {
-    fn description(&self) -> &str {
         match *self {
-            ParseError::SyntaxError => "SyntaxError",
+            ParseError::SyntaxError => write!(f, "SyntaxError"),
         }
     }
 }

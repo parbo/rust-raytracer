@@ -1,20 +1,23 @@
-extern crate rust_raytracer;
 extern crate getopts;
+extern crate rust_raytracer;
 
 use getopts::Options;
+use std::collections::HashSet;
 use std::env;
 use std::fs::File;
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::path::Path;
-use std::collections::HashSet;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} FILE [options]", program);
     print!("{}", opts.usage(&brief));
 }
 
-fn get_contents(path: &Path, defines: &mut HashSet<String>) -> Result<Vec<String>, Box<std::error::Error>> {
+fn get_contents(
+    path: &Path,
+    defines: &mut HashSet<String>,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let input = File::open(path)?;
     let buffered = BufReader::new(input);
     let mut contents = Vec::<String>::new();
@@ -23,7 +26,7 @@ fn get_contents(path: &Path, defines: &mut HashSet<String>) -> Result<Vec<String
         let line = line_iter?;
         if line.starts_with("#include \"") {
             let base = path.parent().unwrap_or(Path::new(""));
-            let include_path = base.join(line[10..line.len()-1].to_string());
+            let include_path = base.join(line[10..line.len() - 1].to_string());
             let mut include_contents = get_contents(&include_path, defines)?;
             contents.append(&mut include_contents);
         } else if line.starts_with("#ifndef ") {
@@ -52,8 +55,8 @@ fn main() {
     opts.optflag("n", "no-render", "don't run the gml");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m }
-        Err(f) => { panic!(f.to_string()) }
+        Ok(m) => m,
+        Err(f) => panic!(f.to_string()),
     };
     if matches.opt_present("h") {
         print_usage(&program, opts);

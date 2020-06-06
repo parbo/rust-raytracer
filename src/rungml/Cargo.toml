@@ -5,7 +5,7 @@ version = "0.0.1"
 authors = ["Par Bohrarper <par.bohrarper@gmail.com>"]
 
 [dependencies]
-rust-raytracer = { version = "0.0.1", path = "../../" }
+rust-raytracer = { version = "^0.1", path = "../../" }
 getopts = "0.2.18"
 
 [profile.release]

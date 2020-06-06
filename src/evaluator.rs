@@ -5,7 +5,6 @@ use raytracer;
 use std::borrow::Borrow;
 use std::clone::Clone;
 use std::collections;
-use std::error::Error as StdError;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -138,20 +137,14 @@ pub enum EvalError {
 
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
-    }
-}
-
-impl StdError for EvalError {
-    fn description(&self) -> &str {
         match *self {
-            EvalError::EmptyStack => "EmptyStack",
-            EvalError::WrongType(_) => "Wrongtype",
-            EvalError::WrongTypeRef => "WrongtypeRef",
-            EvalError::ArrayOutOfBounds(_, _) => "ArrayOutOfBounds",
-            EvalError::InvalidAst => "InvalidAst",
-            EvalError::ParseError(_) => "ParseError",
-        }
+            EvalError::EmptyStack => write!(f, "EmptyStack"),
+            EvalError::WrongType(_) => write!(f, "Wrongtype"),
+            EvalError::WrongTypeRef => write!(f, "WrongtypeRef"),
+            EvalError::ArrayOutOfBounds(_, _) => write!(f, "ArrayOutOfBounds"),
+            EvalError::InvalidAst => write!(f, "InvalidAst"),
+            EvalError::ParseError(_) => write!(f, "ParseError"),
+	}
     }
 }
 

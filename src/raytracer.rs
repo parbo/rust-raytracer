@@ -13,7 +13,7 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> std::io::
     use std::io::Write;
     use std::path::Path;
     let path = Path::new(filename);
-    let mut file = try!(File::create(&path));
+    let mut file = File::create(&path)?;
     let header = format!("P6 {} {} 255\n", w, h);
     let mut data = vec![];
     data.reserve(header.len() + pixels.len() * 3);
@@ -23,7 +23,7 @@ fn write_ppm_file(pixels: &[Pixel], w: i64, h: i64, filename: &str) -> std::io::
         data.push((255.0 * p[1].max(0.0).min(1.0)) as u8);
         data.push((255.0 * p[2].max(0.0).min(1.0)) as u8);
     }
-    try!(file.write_all(&data));
+    file.write_all(&data)?;
     Ok(())
 }
 

@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::error::Error as StdError;
 use std::fmt;
 use std::iter;
 use std::mem;
@@ -20,14 +19,8 @@ pub enum PrimitivesError {
 
 impl fmt::Display for PrimitivesError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.description())
-    }
-}
-
-impl StdError for PrimitivesError {
-    fn description(&self) -> &str {
         match *self {
-            PrimitivesError::InvalidFace(_) => "InvalidFace",
+            PrimitivesError::InvalidFace(_) => write!(f, "InvalidFace"),
         }
     }
 }

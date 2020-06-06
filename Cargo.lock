@@ -7,7 +7,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "rust-raytracer"
-version = "0.0.1"
+version = "0.1.1"
 dependencies = [
  "vecmath 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
